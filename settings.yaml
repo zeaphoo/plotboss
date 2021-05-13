@@ -1,0 +1,30 @@
+# Default/example plotbot.yaml configuration file
+
+main:
+    work_dir: "./plotbot_dir"
+
+plots:
+    dst:
+      - "/mnt/dst/00"
+      - "/mnt/dst/01"
+    plotting:
+      - tmp_dir: "/mnt/tmp/00"
+        tmp_dir2: "/mnt/tmp/01"    # Optional
+        param:
+            k: 32
+            e: False             # Use -e plotting option
+            n_threads: 2         # Threads per job
+            n_buckets: 128       # Number of buckets to split data into
+            job_buffer: 4608     # Per job memory
+        max_jobs: 1
+        job_start_mode: "nodelay"  # nodelay, smart
+
+      - tmp_dir: "/mnt/tmp/02"
+        tmp_dir2: "/mnt/tmp/03"
+        param:
+            k: 32
+            e: False             # Use -e plotting option
+            n_threads: 2         # Threads per job
+            n_buckets: 128       # Number of buckets to split data into
+            job_buffer: 4608     # Per job memory
+        max_jobs: 1
