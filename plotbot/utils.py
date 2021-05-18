@@ -1,6 +1,7 @@
 import math
 import os
 import re
+import platform
 
 GB = 1_000_000_000
 
@@ -53,7 +54,7 @@ def list_k32_plots(d):
             plot = os.path.join(d, plot)
             if os.stat(plot).st_size > (0.95 * get_k32_plotsize()):
                 plots.append(plot)
-    
+
     return plots
 
 def column_wrap(items, n_cols, filler=None):
@@ -67,3 +68,6 @@ def column_wrap(items, n_cols, filler=None):
         rows.append( (row_items + ([filler] * n_cols))[:n_cols] )
     return rows
 
+
+def is_windows():
+    return platform.system() == 'Windows'

@@ -5,7 +5,7 @@ import sys
 
 import texttable as tt
 
-from . import plot_util
+from . import utils
 
 
 def parse_log(logfilenames, clipterminals, bytmp, bybitfield):
@@ -120,11 +120,11 @@ def parse_log(logfilenames, clipterminals, bytmp, bybitfield):
             values = data.get(sl, {}).get(measure, [])
             if(len(values) > 1):
                 row.append('μ=%s σ=%s' % (
-                    plot_util.human_format(statistics.mean(values), 1),
-                    plot_util.human_format(statistics.stdev(values), 0)
+                    utils.human_format(statistics.mean(values), 1),
+                    utils.human_format(statistics.stdev(values), 0)
                     ))
             elif(len(values) == 1):
-                row.append(plot_util.human_format(values[0], 1))
+                row.append(utils.human_format(values[0], 1))
             else:
                 row.append('N/A')
 

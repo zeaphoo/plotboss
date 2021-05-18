@@ -15,6 +15,65 @@ from subprocess import call
 import pendulum
 import psutil
 
+from .utils import is_windows
+
+
+class PlotCommand():
+
+    @classmethod
+    def parse(cls, cmdline):
+        if len(cmdline) < 3:
+            return None
+        cmd0 = cmdline[0]
+        if is_windows() and cmd0.endswith('\\chia.exe'):
+            if cmdline[1] == 'plots' and cmdline[2] == 'create':
+                return cls(cmdline[3:])
+        return None
+
+    def __init__(self, cmd_args):
+        self.cmd_args = self._parse_args(cmd_args)
+        for key, value in self.cmd_args.items():
+            setattr(self, key, value)
+
+    def _parse_args(self, cmd_args):
+        args = {}
+        plot_arg_keys = {
+            'k': dict(name="size", atype="integer"),
+            'r': dict(name="num_threads", atype="integer"),
+            'b': dict(name="buffer", atype="integer"),
+            'u': dict(name="bukets", atype="integer"),
+            't': dict(name="tmp_dir"),
+            '2': dict(name="tmp2_dir"),
+            'd': dict(name="final_dir"),
+            'n': dict(name="num", atype="integer"),
+            'e': dict(name="nobitfield", atype="boolean")
+
+        }
+        for i in range(0, len(cmd_args)):
+            c = cmd_args[i]
+            if c[0]=='-' and c[1] in plot_arg_keys:
+                arg_info = plot_arg_keys[c[1]]
+                akey = arg_info['name']
+                atype = arg_info.get('atype', 'string')
+                avalue = None
+                if atype == 'boolean':
+                    avalue == True
+                else:
+                    if len(c) > 2:
+                        avalue = c[2:]
+                    else:
+                        avalue = cmd_args[i+1] if i < len(cmd_args) else None
+                        i += 1
+                    if atype == 'integer':
+                        try:
+                            avalue = int(avalue)
+                        except:
+                            raise ValueError('Error happened when value {} convert to int.'.format(avalue))
+
+                args[akey] = avalue
+            else:
+                continue
+        return args
 
 def job_phases_for_tmpdir(d, all_jobs):
     '''Return phase 2-tuples for jobs running on tmpdir d'''
@@ -23,30 +82,6 @@ def job_phases_for_tmpdir(d, all_jobs):
 def job_phases_for_dstdir(d, all_jobs):
     '''Return phase 2-tuples for jobs outputting to dstdir d'''
     return sorted([j.progress() for j in all_jobs if j.dstdir == d])
-
-def is_plotting_cmdline(cmdline):
-    return (
-        len(cmdline) >= 4
-        and 'python' in cmdline[0]
-        and cmdline[1].endswith('/chia')
-        and 'plots' == cmdline[2]
-        and 'create' == cmdline[3]
-    )
-
-# This is a cmdline argument fix for https://github.com/ericaltendorf/plotman/issues/41
-def cmdline_argfix(cmdline):
-    known_keys = 'krbut2dne'
-    for i in cmdline:
-        # If the argument starts with dash and a known key and is longer than 2,
-        # then an argument is passed with no space between its key and value.
-        # This is POSIX compliant but the arg parser was tripping over it.
-        # In these cases, splitting that item up in separate key and value
-        # elements results in a `cmdline` list that is correctly formatted.
-        if i[0]=='-' and i[1] in known_keys and len(i)>2:
-            yield i[0:2]  # key
-            yield i[2:]  # value
-        else:
-            yield i
 
 def parse_chia_plot_time(s):
     # This will grow to try ISO8601 as well for when Chia logs that way
@@ -87,8 +122,9 @@ class PlotJob:
             # Ignore processes which most likely have terminated between the time of
             # iteration and data access.
             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
-                if is_plotting_cmdline(proc.cmdline()):
-                    pass
+                plotcmd = PlotCommand.parse(proc.cmdline())
+                if not plotcmd: continue
+                jobs.append(plotcmd)
 
         return jobs
 
