@@ -124,163 +124,34 @@ class PlotJob:
             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
                 plotcmd = PlotCommand.parse(proc.cmdline())
                 if not plotcmd: continue
-                jobs.append(plotcmd)
+                jobs.append(cls.init_from_process(plotcmd, proc))
 
         return jobs
 
-
-    def __init__(self, proc, logroot):
-        '''Initialize from an existing psutil.Process object.  must know logroot in order to understand open files'''
-        self.proc = proc
-
-        with self.proc.oneshot():
-            # Parse command line args
-            args = self.proc.cmdline()
-            assert len(args) > 4
-            assert 'python' in args[0]
-            assert 'chia' in args[1]
-            assert 'plots' == args[2]
-            assert 'create' == args[3]
-            args_iter = iter(cmdline_argfix(args[4:]))
-            for arg in args_iter:
-                val = None if arg in {'-e', '--nobitfield', '-h', '--help', '--override-k'} else next(args_iter)
-                if arg in {'-k', '--size'}:
-                    self.k = val
-                elif arg in {'-r', '--num_threads'}:
-                    self.r = val
-                elif arg in {'-b', '--buffer'}:
-                    self.b = val
-                elif arg in {'-u', '--buckets'}:
-                    self.u = val
-                elif arg in {'-t', '--tmp_dir'}:
-                    self.tmpdir = val
-                elif arg in {'-2', '--tmp2_dir'}:
-                    self.tmp2dir = val
-                elif arg in {'-d', '--final_dir'}:
-                    self.dstdir = val
-                elif arg in {'-n', '--num'}:
-                    self.n = val
-                elif arg in {'-h', '--help'}:
-                    self.help = True
-                elif arg in {'-e', '--nobitfield', '-f', '--farmer_public_key', '-p', '--pool_public_key'}:
-                    pass
-                    # TODO: keep track of these
-                elif arg == '--override-k':
-                    pass
-                else:
-                    print('Warning: unrecognized args: %s %s' % (arg, val))
-
-            # Find logfile (whatever file is open under the log root).  The
-            # file may be open more than once, e.g. for STDOUT and STDERR.
-            for f in self.proc.open_files():
-                if logroot in f.path:
-                    if self.logfile:
-                        assert self.logfile == f.path
-                    else:
-                        self.logfile = f.path
+    @classmethod
+    def init_from_process(cls, plotcmd, proc):
+        logfile = None
+        with proc.oneshot():
+            for f in proc.open_files():
+                if f.path.endswith('.log'):
+                    logfile = f.path
                     break
+        return cls(plotcmd, proc, status="running", logfile=logfile)
 
-            if self.logfile:
-                # Initialize data that needs to be loaded from the logfile
-                self.init_from_logfile()
-            else:
-                print('Found plotting process PID {pid}, but could not find '
-                        'logfile in its open files:'.format(pid = self.proc.pid))
-                for f in self.proc.open_files():
-                    print(f.path)
-
+    def __init__(self, plotcmd, proc, status="waiting", logfile=None):
+        self.plotcmd = plotcmd
+        self.proc =  proc
+        self.logfile = logfile
+        if self.logfile:
+            self._parse_logfile()
 
 
-    def init_from_logfile(self):
+
+    def _parse_logfile(self):
         '''Read plot ID and job start time from logfile.  Return true if we
            find all the info as expected, false otherwise'''
         assert self.logfile
-        # Try reading for a while; it can take a while for the job to get started as it scans
-        # existing plot dirs (especially if they are NFS).
-        found_id = False
-        found_log = False
-        for attempt_number in range(3):
-            with open(self.logfile, 'r') as f:
-                for line in f:
-                    m = re.match('^ID: ([0-9a-f]*)', line)
-                    if m:
-                        self.plot_id = m.group(1)
-                        found_id = True
-                    m = re.match(r'^Starting phase 1/4:.*\.\.\. (.*)', line)
-                    if m:
-                        # Mon Nov  2 08:39:53 2020
-                        self.start_time = parse_chia_plot_time(m.group(1))
-                        found_log = True
-                        break  # Stop reading lines in file
 
-            if found_id and found_log:
-                break  # Stop trying
-            else:
-                time.sleep(1)  # Sleep and try again
-
-        # If we couldn't find the line in the logfile, the job is probably just getting started
-        # (and being slow about it).  In this case, use the last metadata change as the start time.
-        # TODO: we never come back to this; e.g. plot_id may remain uninitialized.
-        # TODO: should we just use the process start time instead?
-        if not found_log:
-            self.start_time = datetime.fromtimestamp(os.path.getctime(self.logfile))
-
-        # Load things from logfile that are dynamic
-        self.update_from_logfile()
-
-    def update_from_logfile(self):
-        self.set_phase_from_logfile()
-
-    def set_phase_from_logfile(self):
-        assert self.logfile
-
-        # Map from phase number to subphase number reached in that phase.
-        # Phase 1 subphases are <started>, table1, table2, ...
-        # Phase 2 subphases are <started>, table7, table6, ...
-        # Phase 3 subphases are <started>, tables1&2, tables2&3, ...
-        # Phase 4 subphases are <started>
-        phase_subphases = {}
-
-        with open(self.logfile, 'r') as f:
-            for line in f:
-                # "Starting phase 1/4: Forward Propagation into tmp files... Sat Oct 31 11:27:04 2020"
-                m = re.match(r'^Starting phase (\d).*', line)
-                if m:
-                    phase = int(m.group(1))
-                    phase_subphases[phase] = 0
-
-                # Phase 1: "Computing table 2"
-                m = re.match(r'^Computing table (\d).*', line)
-                if m:
-                    phase_subphases[1] = max(phase_subphases[1], int(m.group(1)))
-
-                # Phase 2: "Backpropagating on table 2"
-                m = re.match(r'^Backpropagating on table (\d).*', line)
-                if m:
-                    phase_subphases[2] = max(phase_subphases[2], 7 - int(m.group(1)))
-
-                # Phase 3: "Compressing tables 4 and 5"
-                m = re.match(r'^Compressing tables (\d) and (\d).*', line)
-                if m:
-                    phase_subphases[3] = max(phase_subphases[3], int(m.group(1)))
-
-                # TODO also collect timing info:
-
-                # "Time for phase 1 = 22796.7 seconds. CPU (98%) Tue Sep 29 17:57:19 2020"
-                # for phase in ['1', '2', '3', '4']:
-                    # m = re.match(r'^Time for phase ' + phase + ' = (\d+.\d+) seconds..*', line)
-                        # data.setdefault....
-
-                # Total time = 49487.1 seconds. CPU (97.26%) Wed Sep 30 01:22:10 2020
-                # m = re.match(r'^Total time = (\d+.\d+) seconds.*', line)
-                # if m:
-                    # data.setdefault(key, {}).setdefault('total time', []).append(float(m.group(1)))
-
-        if phase_subphases:
-            phase = max(phase_subphases.keys())
-            self.phase = (phase, phase_subphases[phase])
-        else:
-            self.phase = (0, 0)
 
     def progress(self):
         '''Return a 2-tuple with the job phase and subphase (by reading the logfile)'''
