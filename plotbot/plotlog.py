@@ -1,0 +1,112 @@
+import re
+from . import utils
+import pendulum
+
+class PlotLogParser:
+    def __init__(self):
+        self.plot_id = 'xxxxx'
+        self.phase = 0
+        self.phase_time = {}  # Map from phase index to time
+        self.phase_start_time = {}
+        self.phase_subphases = {0:0, 1:0, 2:0, 3:0, 4:0}
+        self.start_time = 0
+        self.total_time = 0
+        self.n_sorts = 0
+        self.n_uniform = 0
+        self.sort_ratio = 0
+        self.temp_dir = ''
+        self.target_path = ''
+        self.completed = False
+
+    @property
+    def progress(self):
+        return (self.phase, self.phase_subphases[self.phase])
+
+    def feed(self, lines):
+        for line in lines:
+            if self.phase == 0:
+                m = re.search(r'Starting plot (\d*)/(\d*)', line)
+                if m:
+                    pass
+
+                m = re.match('^ID: ([0-9a-f]*)', line)
+                if m:
+                    self.plot_id = m.group(1)
+                    self.found_id = True
+
+
+                # Temp dirs.  Sample log line:
+                # Starting plotting progress into temporary dirs: /mnt/tmp/01 and /mnt/tmp/a
+                m = re.search(r'^Starting plotting.*dirs: (.*) and (.*)', line)
+                if m:
+                    self.temp_dir = m.group(1)
+
+            # Phase timing.  Sample log line:
+            # Time for phase 1 = 22796.7 seconds. CPU (98%) Tue Sep 29 17:57:19 2020
+            for phase in range(self.phase + 1, 5):
+                m = re.search(r'^Starting phase {}/4:.*\.\.\. (.*)'.format(phase), line)
+                if m:
+                    starting_time = pendulum.from_format(m.group(1), 'ddd MMM DD HH:mm:ss YYYY', locale='en', tz=None)
+                    if phase == 1:
+                        self.start_time = starting_time
+                    self.phase_start_time[phase] = starting_time
+                    self.phase = phase
+                m = re.search(r'^Time for phase {} = (\d+.\d+) seconds..*'.format(phase), line)
+                if m:
+                    self.phase_time[phase] = float(m.group(1))
+
+            if self.phase == 1:
+                # Phase 1: "Computing table 2"
+                m = re.match(r'^Computing table (\d).*', line)
+                if m:
+                    self.phase_subphases[1] = max(self.phase_subphases[1], int(m.group(1)))
+
+            if self.phase == 2:
+                # Phase 2: "Backpropagating on table 2"
+                m = re.match(r'^Backpropagating on table (\d).*', line)
+                if m:
+                    self.phase_subphases[2] = max(self.phase_subphases[2], 7 - int(m.group(1)))
+
+            if self.phase == 3:
+                # Phase 3: "Compressing tables 4 and 5"
+                m = re.match(r'^Compressing tables (\d) and (\d).*', line)
+                if m:
+                    self.phase_subphases[3] = max(self.phase_subphases[3], int(m.group(1)))
+
+            # Uniform sort.  Sample log line:
+            # Bucket 267 uniform sort. Ram: 0.920GiB, u_sort min: 0.688GiB, qs min: 0.172GiB.
+            #   or
+            # ....?....
+            #   or
+            # Bucket 511 QS. Ram: 0.920GiB, u_sort min: 0.375GiB, qs min: 0.094GiB. force_qs: 1
+
+            if self.phase == 4:
+                m = re.search(r'Bucket \d+ ([^\.]+)\..*', line)
+                if m and not 'force_qs' in line:
+                    sorter = m.group(1)
+                    self.n_sorts += 1
+                    if sorter == 'uniform sort':
+                        self.n_uniform += 1
+                    elif sorter == 'QS':
+                        pass
+                    else:
+                        print ('Warning: unrecognized sort ' + sorter)
+
+            # Job completion.  Record total time in sliced data store.
+            # Sample log line:
+            # Total time = 49487.1 seconds. CPU (97.26%) Wed Sep 30 01:22:10 2020
+            m = re.search(r'^Total time = (\d+.\d+) seconds.*', line)
+            if m:
+                self.total_time = float(m.group(1))
+                self.sort_ratio = 100 * self.n_uniform // self.n_sorts
+                self.completed = True
+
+            m = re.search(r'^Total time = (\d+.\d+) seconds.*', line)
+            if m:
+                self.total_time = float(m.group(1))
+                self.sort_ratio = 100 * self.n_uniform // self.n_sorts
+
+            m = re.search(r'^Renamed final file from (.+)\s+to\s+(.+)', line)
+            if m:
+                self.target_path = m.group(2).strip(' "')
+                self.completed = True

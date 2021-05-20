@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.local.*
+plotbot_data/
 
 # C extensions
 *.so

@@ -1,24 +1,44 @@
-# TODO do we use all these?
-import argparse
 import contextlib
-import logging
 import os
+from plotbot.tail import FileTail
+from plotbot.plotlog import PlotLogParser
 import random
 import re
 import sys
-import threading
-import time
 from datetime import datetime
-from enum import Enum, auto
-from subprocess import call
+import subprocess
+import shutil
+from pathlib import Path
+from basepy.config import settings
 
-import pendulum
 import psutil
 
-from .utils import is_windows
+from .utils import is_windows, gen_job_id, is_macos
 
 
 class PlotCommand():
+    plot_arg_keys = {
+            'k': dict(name="size", atype="integer"),
+            'r': dict(name="num_threads", atype="integer"),
+            'b': dict(name="buffer", atype="integer"),
+            'u': dict(name="bukets", atype="integer"),
+            't': dict(name="tmp_dir"),
+            '2': dict(name="tmp_dir2"),
+            'd': dict(name="final_dir"),
+            'n': dict(name="num", atype="integer"),
+            'e': dict(name="nobitfield", atype="boolean")
+    }
+    plot_arg_names = {
+        'size': 'k',
+        'num_threads': 'r',
+        'buffer': 'b',
+        'bukets': 'u',
+        'tmp_dir': 't',
+        'tmp_dir2': '2',
+        'final_dir': 'd',
+        'num': 'n',
+        'nobitfield': 'e'
+    }
 
     @classmethod
     def parse(cls, cmdline):
@@ -30,29 +50,27 @@ class PlotCommand():
                 return cls(cmdline[3:])
         return None
 
-    def __init__(self, cmd_args):
-        self.cmd_args = self._parse_args(cmd_args)
+    def __init__(self, **kwargs):
+        self.cmd_args = {}
+        for key in kwargs:
+            if key in self.plot_arg_names:
+                self.cmd_args[key] = kwargs[key]
         for key, value in self.cmd_args.items():
             setattr(self, key, value)
 
-    def _parse_args(self, cmd_args):
-        args = {}
-        plot_arg_keys = {
-            'k': dict(name="size", atype="integer"),
-            'r': dict(name="num_threads", atype="integer"),
-            'b': dict(name="buffer", atype="integer"),
-            'u': dict(name="bukets", atype="integer"),
-            't': dict(name="tmp_dir"),
-            '2': dict(name="tmp2_dir"),
-            'd': dict(name="final_dir"),
-            'n': dict(name="num", atype="integer"),
-            'e': dict(name="nobitfield", atype="boolean")
+    @classmethod
+    def init_from_cmdlines(cls, cmdlines):
+        args = cls._parse_args(cmdlines)
+        return cls(**args)
 
-        }
-        for i in range(0, len(cmd_args)):
-            c = cmd_args[i]
-            if c[0]=='-' and c[1] in plot_arg_keys:
-                arg_info = plot_arg_keys[c[1]]
+    @classmethod
+    def _parse_args(cls, cmdlines):
+        args = {}
+
+        for i in range(0, len(cmdlines)):
+            c = cmdlines[i]
+            if c[0]=='-' and c[1] in cls.plot_arg_keys:
+                arg_info = cls.plot_arg_keys[c[1]]
                 akey = arg_info['name']
                 atype = arg_info.get('atype', 'string')
                 avalue = None
@@ -62,7 +80,7 @@ class PlotCommand():
                     if len(c) > 2:
                         avalue = c[2:]
                     else:
-                        avalue = cmd_args[i+1] if i < len(cmd_args) else None
+                        avalue = cmdlines[i+1] if i < len(cmdlines) else None
                         i += 1
                     if atype == 'integer':
                         try:
@@ -75,47 +93,39 @@ class PlotCommand():
                 continue
         return args
 
-def job_phases_for_tmpdir(d, all_jobs):
-    '''Return phase 2-tuples for jobs running on tmpdir d'''
-    return sorted([j.progress() for j in all_jobs if j.tmpdir == d])
+    def get_cmd(self):
+        cmd = [self.chia_cmd(), 'plots', 'create']
+        for key, value in self.cmd_args.items():
+            cmd.append('-{}'.format(self.plot_arg_names[key]))
+            if value in [True, False]: continue
+            cmd.append(value)
+        return cmd
 
-def job_phases_for_dstdir(d, all_jobs):
-    '''Return phase 2-tuples for jobs outputting to dstdir d'''
-    return sorted([j.progress() for j in all_jobs if j.dstdir == d])
+    def chia_cmd(self):
+        cmd = shutil.which('chia')
+        if not cmd:
+            if is_windows():
+                cmd = self._find_chia_windows()
+        return cmd or 'chia'
 
-def parse_chia_plot_time(s):
-    # This will grow to try ISO8601 as well for when Chia logs that way
-    return pendulum.from_format(s, 'ddd MMM DD HH:mm:ss YYYY', locale='en', tz=None)
 
-# TODO: be more principled and explicit about what we cache vs. what we look up
-# dynamically from the logfile
+    def _find_chia_windows(self):
+        home = Path.home()
+        chia_root_path = os.path.join(str(home), 'AppData', 'Local', 'chia-blockchain')
+        chia_path = None
+        if not os.path.exists(chia_root_path): return None
+        with os.scandir(chia_root_path) as it:
+            for entry in it:
+                if entry.name.startswith('app-') and entry.is_dir():
+                    chia_path = os.path.join(chia_root_path, entry.name)
+        if not chia_path: return None
+        chia_path = os.path.join(chia_path, 'resources', 'app.asar.unpacked', 'daemon', 'chia.exe')
+        return chia_path
+
+
 class PlotJob:
-    'Represents a plotter job'
-
-    # These are constants, not updated during a run.
-    k = 0
-    r = 0
-    u = 0
-    b = 0
-    n = 0  # probably not used
-    tmpdir = ''
-    tmp2dir = ''
-    dstdir = ''
-    logfile = ''
-    jobfile = ''
-    job_id = 0
-    plot_id = '--------'
-    proc = None   # will get a psutil.Process
-    help = False
-
-    # These are dynamic, cached, and need to be udpated periodically
-    phase = (None, None)   # Phase/subphase
-
     @classmethod
     def get_running_jobs(cls):
-        '''Return a list of running plot jobs.  If a cache of preexisting jobs is provided,
-           reuse those previous jobs without updating their information.  Always look for
-           new jobs not already in the cache.'''
         jobs = []
 
         for proc in psutil.process_iter(['pid', 'cmdline']):
@@ -139,42 +149,43 @@ class PlotJob:
         return cls(plotcmd, proc, status="running", logfile=logfile)
 
     def __init__(self, plotcmd, proc, status="waiting", logfile=None):
+        self.job_id = gen_job_id()
         self.plotcmd = plotcmd
         self.proc =  proc
         self.logfile = logfile
+        self.logparser = PlotLogParser()
+        self.logtail = None
         if self.logfile:
             self._parse_logfile()
-
 
 
     def _parse_logfile(self):
         '''Read plot ID and job start time from logfile.  Return true if we
            find all the info as expected, false otherwise'''
         assert self.logfile
+        if not self.logtail:
+            self.logtail = FileTail(self.logfile)
+        lines = self.logtail.tail()
+        self.logparser.feed(lines)
 
+    def update(self):
+        lines = self.logtail.tail()
+        if lines:
+            self.logparser.feed(lines)
 
     def progress(self):
         '''Return a 2-tuple with the job phase and subphase (by reading the logfile)'''
-        return self.phase
+        return self.logparser.progress
 
     def plot_id_prefix(self):
-        return self.plot_id[:8]
+        return self.logparser.plot_id[:8]
 
-    # TODO: make this more useful and complete, and/or make it configurable
-    def status_str_long(self):
-        return '{plot_id}\nk={k} r={r} b={b} u={u}\npid:{pid}\ntmp:{tmp}\ntmp2:{tmp2}\ndst:{dst}\nlogfile:{logfile}'.format(
-            plot_id = self.plot_id,
-            k = self.k,
-            r = self.r,
-            b = self.b,
-            u = self.u,
-            pid = self.proc.pid,
-            tmp = self.tmpdir,
-            tmp2 = self.tmp2dir,
-            dst = self.dstdir,
-            plotid = self.plot_id,
-            logfile = self.logfile
-            )
+    def status_info(self):
+        p = self.logparser
+        status =  dict(
+            plot_id = p.plot_id
+        )
+        return status
 
     def get_mem_usage(self):
         return self.proc.memory_info().vms  # Total, inc swapped
@@ -195,13 +206,13 @@ class PlotJob:
         '''Running, suspended, etc.'''
         status = self.proc.status()
         if status == psutil.STATUS_RUNNING:
-            return 'RUN'
+            return 'Running'
         elif status == psutil.STATUS_SLEEPING:
-            return 'SLP'
+            return 'Sleeping'
         elif status == psutil.STATUS_DISK_SLEEP:
-            return 'DSK'
+            return 'DiskSleep'
         elif status == psutil.STATUS_STOPPED:
-            return 'STP'
+            return 'Stopped'
         else:
             return self.proc.status()
 
@@ -230,6 +241,15 @@ class PlotJob:
     def resume(self):
         self.proc.resume()
 
+    def start(self):
+        plot_args = self.plotcmd.get_cmd()
+        plot_args.append('>')
+        plot_args.append(self._get_log_path())
+        plot_args.append('2>&1')
+        p = subprocess.Popen(plot_args,
+                shell=True)
+        self.proc = psutil.Process(p.pid)
+
     def get_temp_files(self):
         # Prevent duplicate file paths by using set.
         temp_files = set([])
@@ -238,11 +258,12 @@ class PlotJob:
                 temp_files.add(f.path)
         return temp_files
 
+    def _get_log_path(self):
+        log_root = os.path.join(settings.main.get('work_dir', './plotbot_data'), 'logs')
+        if not os.path.exists(log_root):
+            os.makedirs(log_root)
+        return os.path.join(log_root, '{}.log'.format(self.job_id))
+
     def cancel(self):
-        'Cancel an already running job'
-        # We typically suspend the job as the first action in killing it, so it
-        # doesn't create more tmp files during death.  However, terminate() won't
-        # complete if the job is supsended, so we also need to resume it.
-        # TODO: check that this is best practice for killing a job.
-        self.proc.resume()
+        #self.proc.resume()
         self.proc.terminate()

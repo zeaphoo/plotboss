@@ -2,6 +2,8 @@ import math
 import os
 import re
 import platform
+import string
+import random
 
 GB = 1_000_000_000
 
@@ -68,6 +70,14 @@ def column_wrap(items, n_cols, filler=None):
         rows.append( (row_items + ([filler] * n_cols))[:n_cols] )
     return rows
 
+def gen_job_id():
+    return 'pj' + ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(14))
 
 def is_windows():
     return platform.system() == 'Windows'
+
+def is_macos():
+    return platform.system() == 'Darwin'
+
+def is_linux():
+    return platform.system() == 'Linux'

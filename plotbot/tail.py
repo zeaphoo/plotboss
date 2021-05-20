@@ -17,10 +17,15 @@ class FileTail(object):
         self.check_file_validity(target_file)
         self.target_file = target_file
 
-    def tail(self):
+    def tail(self, seek_end=False):
         with open(self.target_file) as file_:
             file_.seek(self.last_pos, 0)
-            lines = []
+            if seek_end:
+                lines = []
+                file_.seek(0, 2)
+                self.last_pos = file_.tell()
+            else:
+                lines = file_.readlines()
             while True:
                 line = file_.readline()
 

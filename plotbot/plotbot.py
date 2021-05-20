@@ -7,7 +7,7 @@ from .job import PlotJob
 
 class PlotBot():
     def __init__(self):
-        self.work_dir = os.path.abspath(settings.main.get('work_dir', './plotbot_work'))
+        self.work_dir = os.path.abspath(settings.main.get('work_dir', './plotbot_data'))
         self.init_work_dir()
 
     def init_work_dir(self):
