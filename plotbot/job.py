@@ -47,7 +47,7 @@ class PlotCommand():
         cmd0 = cmdline[0]
         if is_windows() and cmd0.endswith('\\chia.exe'):
             if cmdline[1] == 'plots' and cmdline[2] == 'create':
-                return cls(cmdline[3:])
+                return cls.init_from_cmdlines(cmdline[3:])
         return None
 
     def __init__(self, **kwargs):
@@ -173,9 +173,14 @@ class PlotJob:
         if lines:
             self.logparser.feed(lines)
 
+    @property
     def progress(self):
         '''Return a 2-tuple with the job phase and subphase (by reading the logfile)'''
         return self.logparser.progress
+
+    @property
+    def tmp_dir(self):
+        return self.logparser.temp_dir
 
     def plot_id_prefix(self):
         return self.logparser.plot_id[:8]
