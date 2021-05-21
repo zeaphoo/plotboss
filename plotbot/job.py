@@ -148,7 +148,12 @@ class PlotJob:
                     break
         return cls(plotcmd, proc, status="running", logfile=logfile)
 
-    def __init__(self, plotcmd, proc, status="waiting", logfile=None):
+    @classmethod
+    def new(cls, **kwargs):
+        plotcmd = PlotCommand(**kwargs)
+        return cls(plotcmd)
+
+    def __init__(self, plotcmd, proc=None, status="waiting", logfile=None):
         self.job_id = gen_job_id()
         self.plotcmd = plotcmd
         self.proc =  proc
@@ -181,6 +186,14 @@ class PlotJob:
     @property
     def temp_dir(self):
         return self.logparser.temp_dir
+
+    @property
+    def temp_dir2(self):
+        return self.logparser.temp_dir2
+
+    @property
+    def final_dir(self):
+        return self.plotcmd.final_dir
 
     def plot_id_prefix(self):
         return self.logparser.plot_id[:8]
@@ -248,18 +261,21 @@ class PlotJob:
 
     def start(self):
         plot_args = self.plotcmd.get_cmd()
+        logfile = self._get_log_path()
         plot_args.append('>')
-        plot_args.append(self._get_log_path())
+        plot_args.append(logfile)
         plot_args.append('2>&1')
         p = subprocess.Popen(plot_args,
                 shell=True)
         self.proc = psutil.Process(p.pid)
+        self.logfile = logfile
+        self.logtail = FileTail(self.logfile)
 
     def get_temp_files(self):
         # Prevent duplicate file paths by using set.
         temp_files = set([])
         for f in self.proc.open_files():
-            if self.tmpdir in f.path or self.tmp2dir in f.path or self.dstdir in f.path:
+            if self.temp_dir in f.path or self.temp_dir2 in f.path or self.final_dir in f.path:
                 temp_files.add(f.path)
         return temp_files
 
