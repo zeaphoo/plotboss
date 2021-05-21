@@ -22,8 +22,8 @@ class PlotCommand():
             'r': dict(name="num_threads", atype="integer"),
             'b': dict(name="buffer", atype="integer"),
             'u': dict(name="bukets", atype="integer"),
-            't': dict(name="tmp_dir"),
-            '2': dict(name="tmp_dir2"),
+            't': dict(name="temp_dir"),
+            '2': dict(name="temp_dir2"),
             'd': dict(name="final_dir"),
             'n': dict(name="num", atype="integer"),
             'e': dict(name="nobitfield", atype="boolean")
@@ -33,8 +33,8 @@ class PlotCommand():
         'num_threads': 'r',
         'buffer': 'b',
         'bukets': 'u',
-        'tmp_dir': 't',
-        'tmp_dir2': '2',
+        'temp_dir': 't',
+        'temp_dir2': '2',
         'final_dir': 'd',
         'num': 'n',
         'nobitfield': 'e'
@@ -179,7 +179,7 @@ class PlotJob:
         return self.logparser.progress
 
     @property
-    def tmp_dir(self):
+    def temp_dir(self):
         return self.logparser.temp_dir
 
     def plot_id_prefix(self):

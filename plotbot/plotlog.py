@@ -15,6 +15,7 @@ class PlotLogParser:
         self.n_uniform = 0
         self.sort_ratio = 0
         self.temp_dir = ''
+        self.temp_dir2 = ''
         self.target_path = ''
         self.completed = False
 
@@ -29,17 +30,18 @@ class PlotLogParser:
                 if m:
                     pass
 
-                m = re.match('^ID: ([0-9a-f]*)', line)
-                if m:
-                    self.plot_id = m.group(1)
-                    self.found_id = True
-
-
                 # Temp dirs.  Sample log line:
                 # Starting plotting progress into temporary dirs: /mnt/tmp/01 and /mnt/tmp/a
                 m = re.search(r'^Starting plotting.*dirs: (.*) and (.*)', line)
                 if m:
                     self.temp_dir = m.group(1)
+                    self.temp_dir2 = m.group(2)
+
+                m = re.match('^ID: ([0-9a-f]*)', line)
+                if m:
+                    self.plot_id = m.group(1)
+                    self.found_id = True
+
 
             # Phase timing.  Sample log line:
             # Time for phase 1 = 22796.7 seconds. CPU (98%) Tue Sep 29 17:57:19 2020

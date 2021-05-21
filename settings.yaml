@@ -2,14 +2,15 @@
 
 main:
     work_dir: "./plotbot_data"
+    max_jobs: 10
 
 plots:
-    dst:
+    final_path:
       - "/mnt/dst/00"
       - "/mnt/dst/01"
     plotting:
-      - tmp_dir: "/mnt/tmp/00"
-        tmp_dir2: "/mnt/tmp/01"    # Optional
+      - temp_dir: "/mnt/tmp/00"
+        temp_dir2: "/mnt/tmp/01"    # Optional
         param:
             size: 32
             nobitfield: False             # Use -e plotting option
@@ -17,10 +18,10 @@ plots:
             bukets: 128       # Number of buckets to split data into
             buffer: 4608     # Per job memory
         max_jobs: 1
-        job_start_mode: "nodelay"  # nodelay, smart
+        job_start_mode: "simple"  # simple, smart
 
-      - tmp_dir: "/mnt/tmp/02"
-        tmp_dir2: "/mnt/tmp/03"
+      - temp_dir: "/mnt/tmp/02"
+        temp_dir2: "/mnt/tmp/03"
         param:
             size: 32
             nobitfield: False             # Use -e plotting option
