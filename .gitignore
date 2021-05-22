@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.local.*
 plotbot_data/
+.vscode/
 
 # C extensions
 *.so

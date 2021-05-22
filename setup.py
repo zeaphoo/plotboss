@@ -28,7 +28,7 @@ setup(
     include_package_data=False,
     zip_safe=False,
     platforms='any',
-    install_requires=['basepy', 'psutil', 'pendulum', 'texttable'],
+    install_requires=['basepy', 'psutil', 'pendulum', 'asciimatics'],
     extras_require={
         'test': [
             'pytest>=3',

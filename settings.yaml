@@ -5,23 +5,26 @@ main:
     max_jobs: 10
 
 plots:
-    final_path:
+    final_dir:
       - "/mnt/dst/00"
       - "/mnt/dst/01"
     plotting:
-      - temp_dir: "/mnt/tmp/00"
-        temp_dir2: "/mnt/tmp/01"    # Optional
+      - tmp_dir: "/mnt/tmp/00"
+        tmp2_dir: "/mnt/tmp/01"    # Optional
         param:
             size: 32
             nobitfield: False             # Use -e plotting option
+            farmer_key: ""
+            pool_key: ""
+            pool_address: ""
             num_threads: 2         # Threads per job
             bukets: 128       # Number of buckets to split data into
             buffer: 4608     # Per job memory
         max_jobs: 1
         job_start_mode: "simple"  # simple, smart
 
-      - temp_dir: "/mnt/tmp/02"
-        temp_dir2: "/mnt/tmp/03"
+      - tmp_dir: "/mnt/tmp/02"
+        tmp2_dir: "/mnt/tmp/03"
         param:
             size: 32
             nobitfield: False             # Use -e plotting option

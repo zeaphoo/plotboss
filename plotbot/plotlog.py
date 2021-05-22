@@ -14,8 +14,8 @@ class PlotLogParser:
         self.n_sorts = 0
         self.n_uniform = 0
         self.sort_ratio = 0
-        self.temp_dir = ''
-        self.temp_dir2 = ''
+        self.tmp_dir = ''
+        self.tmp2_dir = ''
         self.target_path = ''
         self.completed = False
 
@@ -34,8 +34,8 @@ class PlotLogParser:
                 # Starting plotting progress into temporary dirs: /mnt/tmp/01 and /mnt/tmp/a
                 m = re.search(r'^Starting plotting.*dirs: (.*) and (.*)', line)
                 if m:
-                    self.temp_dir = m.group(1)
-                    self.temp_dir2 = m.group(2)
+                    self.tmp_dir = m.group(1)
+                    self.tmp2_dir = m.group(2)
 
                 m = re.match('^ID: ([0-9a-f]*)', line)
                 if m:

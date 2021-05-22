@@ -71,7 +71,7 @@ def column_wrap(items, n_cols, filler=None):
     return rows
 
 def gen_job_id():
-    return 'pj' + ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(14))
+    return 'pj' + ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(10))
 
 def is_windows():
     return platform.system() == 'Windows'

@@ -2,14 +2,13 @@ import contextlib
 import os
 from plotbot.tail import FileTail
 from plotbot.plotlog import PlotLogParser
-import random
-import re
-import sys
+import time
 from datetime import datetime
 import subprocess
 import shutil
 from pathlib import Path
 from basepy.config import settings
+from basepy.log import logger
 
 import psutil
 
@@ -22,9 +21,12 @@ class PlotCommand():
             'r': dict(name="num_threads", atype="integer"),
             'b': dict(name="buffer", atype="integer"),
             'u': dict(name="bukets", atype="integer"),
-            't': dict(name="temp_dir"),
-            '2': dict(name="temp_dir2"),
+            't': dict(name="tmp_dir"),
+            '2': dict(name="tmp2_dir"),
             'd': dict(name="final_dir"),
+            'c': dict(name="pool_address"),
+            'f': dict(name="farmer_key"),
+            'p': dict(name="pool_key"),
             'n': dict(name="num", atype="integer"),
             'e': dict(name="nobitfield", atype="boolean")
     }
@@ -33,9 +35,12 @@ class PlotCommand():
         'num_threads': 'r',
         'buffer': 'b',
         'bukets': 'u',
-        'temp_dir': 't',
-        'temp_dir2': '2',
+        'tmp_dir': 't',
+        'tmp2_dir': '2',
         'final_dir': 'd',
+        'pool_address': 'c',
+        'farmer_key': 'f',
+        'pool_key': 'p',
         'num': 'n',
         'nobitfield': 'e'
     }
@@ -45,7 +50,7 @@ class PlotCommand():
         if len(cmdline) < 3:
             return None
         cmd0 = cmdline[0]
-        if is_windows() and cmd0.endswith('\\chia.exe'):
+        if is_windows() and cmd0.lower().endswith('\\chia.exe'):
             if cmdline[1] == 'plots' and cmdline[2] == 'create':
                 return cls.init_from_cmdlines(cmdline[3:])
         return None
@@ -57,6 +62,7 @@ class PlotCommand():
                 self.cmd_args[key] = kwargs[key]
         for key, value in self.cmd_args.items():
             setattr(self, key, value)
+        logger.debug('cmd_args', cmd_args=self.cmd_args)
 
     @classmethod
     def init_from_cmdlines(cls, cmdlines):
@@ -93,12 +99,19 @@ class PlotCommand():
                 continue
         return args
 
+    def arg_name_type(self, name):
+        arg_define = list(filter(lambda x: x['name'] == name, self.plot_arg_keys.values()))[0]
+        return arg_define.get('atype', 'string')
+
     def get_cmd(self):
         cmd = [self.chia_cmd(), 'plots', 'create']
         for key, value in self.cmd_args.items():
+            if self.arg_name_type(key) in ['boolean']:
+                if value == True:
+                    cmd.append('-{}'.format(self.plot_arg_names[key]))
+                continue
             cmd.append('-{}'.format(self.plot_arg_names[key]))
-            if value in [True, False]: continue
-            cmd.append(value)
+            cmd.append(str(value))
         return cmd
 
     def chia_cmd(self):
@@ -150,7 +163,10 @@ class PlotJob:
 
     @classmethod
     def new(cls, **kwargs):
-        plotcmd = PlotCommand(**kwargs)
+        args = kwargs
+        if 'num' in args:
+            args['num'] = 1
+        plotcmd = PlotCommand(**args)
         return cls(plotcmd)
 
     def __init__(self, plotcmd, proc=None, status="waiting", logfile=None):
@@ -168,15 +184,19 @@ class PlotJob:
         '''Read plot ID and job start time from logfile.  Return true if we
            find all the info as expected, false otherwise'''
         assert self.logfile
+        if not os.path.exists(self.logfile):
+            return
         if not self.logtail:
             self.logtail = FileTail(self.logfile)
         lines = self.logtail.tail()
         self.logparser.feed(lines)
 
     def update(self):
-        lines = self.logtail.tail()
-        if lines:
-            self.logparser.feed(lines)
+        self._parse_logfile()
+
+    @property
+    def phase(self):
+        return self.logparser.phase
 
     @property
     def progress(self):
@@ -184,16 +204,32 @@ class PlotJob:
         return self.logparser.progress
 
     @property
-    def temp_dir(self):
-        return self.logparser.temp_dir
+    def tmp_dir(self):
+        return self.plotcmd.tmp_dir
 
     @property
-    def temp_dir2(self):
-        return self.logparser.temp_dir2
+    def tmp2_dir(self):
+        return self.plotcmd.tmp2_dir
 
     @property
     def final_dir(self):
         return self.plotcmd.final_dir
+
+    @property
+    def pid(self):
+        return self.proc.pid
+
+    @property
+    def elapsed_time(self):
+        return 0
+
+    @property
+    def status(self):
+        return self.get_run_status
+
+    @property
+    def completed(self):
+        return self.logparser.completed
 
     def plot_id_prefix(self):
         return self.logparser.plot_id[:8]
@@ -265,22 +301,34 @@ class PlotJob:
         plot_args.append('>')
         plot_args.append(logfile)
         plot_args.append('2>&1')
+        logger.debug('plot_args', plot_args=plot_args)
         p = subprocess.Popen(plot_args,
                 shell=True)
         self.proc = psutil.Process(p.pid)
         self.logfile = logfile
-        self.logtail = FileTail(self.logfile)
+        if self.wait_file(self.logfile, 6.0):
+            self.logtail = FileTail(self.logfile)
+            return True
+
+    def wait_file(self, fpath, timeout=3.0):
+        start_time = time.time()
+        while 1:
+            if os.path.exists(fpath):
+                return True
+            if time.time() - start_time > timeout:
+                return False
+            time.sleep(1.0)
 
     def get_temp_files(self):
         # Prevent duplicate file paths by using set.
         temp_files = set([])
         for f in self.proc.open_files():
-            if self.temp_dir in f.path or self.temp_dir2 in f.path or self.final_dir in f.path:
+            if self.tmp_dir in f.path or self.tmp2_dir in f.path or self.final_dir in f.path:
                 temp_files.add(f.path)
         return temp_files
 
     def _get_log_path(self):
-        log_root = os.path.join(settings.main.get('work_dir', './plotbot_data'), 'logs')
+        log_root = os.path.abspath(os.path.join(settings.main.get('work_dir', './plotbot_data'), 'logs'))
         if not os.path.exists(log_root):
             os.makedirs(log_root)
         return os.path.join(log_root, '{}.log'.format(self.job_id))
