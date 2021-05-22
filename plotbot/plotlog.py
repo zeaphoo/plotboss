@@ -21,7 +21,12 @@ class PlotLogParser:
 
     @property
     def progress(self):
-        return (self.phase, self.phase_subphases[self.phase])
+        phase_offset = {1:0, 2:7, 3:13, 4:19}
+        phase_sum = 22 # 7 + 6 + 6 + 3
+        current = phase_offset[self.phase] + self.phase_subphases[self.phase] - 1
+        if current < 0:
+            current = 0.1
+        return (current*100.0)/(phase_sum-1)
 
     def feed(self, lines):
         for line in lines:
@@ -67,7 +72,7 @@ class PlotLogParser:
                 # Phase 2: "Backpropagating on table 2"
                 m = re.match(r'^Backpropagating on table (\d).*', line)
                 if m:
-                    self.phase_subphases[2] = max(self.phase_subphases[2], 7 - int(m.group(1)))
+                    self.phase_subphases[2] = max(self.phase_subphases[2], 8 - int(m.group(1)))
 
             if self.phase == 3:
                 # Phase 3: "Compressing tables 4 and 5"
@@ -93,6 +98,7 @@ class PlotLogParser:
                         pass
                     else:
                         print ('Warning: unrecognized sort ' + sorter)
+                self.phase_subphases[4] = 1
 
             # Job completion.  Record total time in sliced data store.
             # Sample log line:
@@ -101,14 +107,10 @@ class PlotLogParser:
             if m:
                 self.total_time = float(m.group(1))
                 self.sort_ratio = 100 * self.n_uniform // self.n_sorts
-                self.completed = True
-
-            m = re.search(r'^Total time = (\d+.\d+) seconds.*', line)
-            if m:
-                self.total_time = float(m.group(1))
-                self.sort_ratio = 100 * self.n_uniform // self.n_sorts
+                self.phase_subphases[4] = 2
 
             m = re.search(r'^Renamed final file from (.+)\s+to\s+(.+)', line)
             if m:
                 self.target_path = m.group(2).strip(' "')
+                self.phase_subphases[4] = 3
                 self.completed = True

@@ -10,6 +10,7 @@ import sys
 from collections import defaultdict
 import time
 from datetime import datetime
+from .utils import time_format
 
 def readable_mem(mem):
     for suffix in ["", "K", "M", "G", "T"]:
@@ -45,9 +46,9 @@ class PlotJobFrame(Frame):
         self._header.custom_colour = "label"
         self._list = MultiColumnListBox(
             Widget.FILL_FRAME,
-            [">12", "<40", ">7", ">7", ">10", ">16", "100%"],
+            [">12", ">12", "<32", ">8", ">8", ">10", ">16", "100%"],
             [],
-            titles=["JOB_ID", "TMP_DIR", "PID", "PHASE", "ELAPSED", "PROGRESS", "FINAL_DIR"],
+            titles=["JOB_ID", "PLOT_ID", "TMP_DIR", "PID", "PHASE", "ELAPSED", "PROGRESS", "FINAL_DIR"],
             name="mc_list",
             parser=AsciimaticsParser())
         self.add_layout(layout)
@@ -92,10 +93,11 @@ class PlotJobFrame(Frame):
             for job in running_jobs:
                 data = [
                     job.job_id,
+                    job.plot_id_prefix(),
                     job.tmp_dir,
                     job.pid,
                     job.phase,
-                    job.elapsed_time,
+                    time_format(job.elapsed_time),
                     job.progress,
                     job.final_dir
                 ]
@@ -112,7 +114,8 @@ class PlotJobFrame(Frame):
                     str(x[3]),
                     str(x[4]),
                     str(x[5]),
-                    str(x[6])
+                    '{:0.1f}%'.format(x[6]),
+                    str(x[7])
                 ], idx) for idx, x in enumerate(list_data)
             ]
 

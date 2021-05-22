@@ -31,23 +31,6 @@ def time_format(sec):
     else:
         return '%d:%02d' % (int(sec / 3600), int((sec % 3600) / 60))
 
-def tmpdir_phases_str(tmpdir_phases_pair):
-    tmpdir = tmpdir_phases_pair[0]
-    phases = tmpdir_phases_pair[1]
-    phase_str = ', '.join(['%d:%d' % ph_subph for ph_subph in sorted(phases)])
-    return ('%s (%s)' % (tmpdir, phase_str))
-
-def split_path_prefix(items):
-    if not items:
-        return ('', [])
-
-    prefix = os.path.commonpath(items)
-    if prefix == '/':
-        return ('', items)
-    else:
-        remainders = [ os.path.relpath(i, prefix) for i in items ]
-        return (prefix, remainders)
-
 def list_k32_plots(d):
     'List completed k32 plots in a directory (not recursive)'
     plots = []
@@ -59,19 +42,9 @@ def list_k32_plots(d):
 
     return plots
 
-def column_wrap(items, n_cols, filler=None):
-    '''Take items, distribute among n_cols columns, and return a set
-       of rows containing the slices of those columns.'''
-    rows = []
-    n_rows = math.ceil(len(items) / n_cols)
-    for row in range(n_rows):
-        row_items = items[row : : n_rows]
-        # Pad and truncate
-        rows.append( (row_items + ([filler] * n_cols))[:n_cols] )
-    return rows
 
 def gen_job_id():
-    return 'pj' + ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(10))
+    return 'pj' + ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
 
 def is_windows():
     return platform.system() == 'Windows'

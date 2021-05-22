@@ -11,6 +11,7 @@ from basepy.config import settings
 from basepy.log import logger
 
 import psutil
+from psutil import NoSuchProcess
 
 from .utils import is_windows, gen_job_id, is_macos
 
@@ -170,7 +171,11 @@ class PlotJob:
         return cls(plotcmd)
 
     def __init__(self, plotcmd, proc=None, status="waiting", logfile=None):
-        self.job_id = gen_job_id()
+        if logfile is not None :
+            job_id = os.path.splitext(os.path.basename(logfile))[0]
+        else:
+            job_id = gen_job_id()
+        self.job_id = job_id
         self.plotcmd = plotcmd
         self.proc =  proc
         self.logfile = logfile
@@ -221,7 +226,8 @@ class PlotJob:
 
     @property
     def elapsed_time(self):
-        return 0
+        create_time = datetime.fromtimestamp(self.proc.create_time())
+        return int((datetime.now() - create_time).total_seconds())
 
     @property
     def status(self):
@@ -258,7 +264,10 @@ class PlotJob:
 
     def get_run_status(self):
         '''Running, suspended, etc.'''
-        status = self.proc.status()
+        try:
+            status = self.proc.status()
+        except NoSuchProcess:
+            return 'Stopped'
         if status == psutil.STATUS_RUNNING:
             return 'Running'
         elif status == psutil.STATUS_SLEEPING:
@@ -269,10 +278,6 @@ class PlotJob:
             return 'Stopped'
         else:
             return self.proc.status()
-
-    def get_time_wall(self):
-        create_time = datetime.fromtimestamp(self.proc.create_time())
-        return int((datetime.now() - create_time).total_seconds())
 
     def get_time_user(self):
         return int(self.proc.cpu_times().user)
@@ -296,14 +301,22 @@ class PlotJob:
         self.proc.resume()
 
     def start(self):
+        assert self.proc == None
         plot_args = self.plotcmd.get_cmd()
         logfile = self._get_log_path()
         plot_args.append('>')
         plot_args.append(logfile)
         plot_args.append('2>&1')
         logger.debug('plot_args', plot_args=plot_args)
+        kwargs = {}
+        if is_windows():
+            kwargs = {
+                'creationflags': subprocess.CREATE_NEW_CONSOLE | subprocess.HIGH_PRIORITY_CLASS,
+            }
+
         p = subprocess.Popen(plot_args,
-                shell=True)
+                shell=True,
+                **kwargs)
         self.proc = psutil.Process(p.pid)
         self.logfile = logfile
         if self.wait_file(self.logfile, 6.0):

@@ -111,6 +111,9 @@ class PlotBot():
             if job.completed:
                 self.completed_jobs.append(job)
                 continue
+            status = job.get_run_status()
+            if status.lower() == 'stopped':
+                continue
             running_jobs.append(job)
             tmp_dir  = job.tmp_dir
             if tmp_dir not in running_info:
