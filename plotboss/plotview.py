@@ -11,6 +11,7 @@ from collections import defaultdict
 import time
 from datetime import datetime
 from .utils import time_format
+import copy
 
 def readable_mem(mem):
     for suffix in ["", "K", "M", "G", "T"]:
@@ -28,7 +29,7 @@ def readable_pc(percent):
 
 
 class PlotJobFrame(Frame):
-    def __init__(self, screen, plotbot, name="My Form"):
+    def __init__(self, screen, plotboss, name="My Form"):
         super(PlotJobFrame, self).__init__(screen,
                                         screen.height,
                                         screen.width,
@@ -37,7 +38,7 @@ class PlotJobFrame(Frame):
         # Internal state required for doing periodic updates
         self._last_frame = 0
         self._reverse = True
-        self.plotbot = plotbot
+        self.plotboss = plotboss
 
         # Create the basic form layout...
         layout = Layout([1], fill_frame=True)
@@ -89,7 +90,7 @@ class PlotJobFrame(Frame):
             last_selection = self._list.value
             last_start = self._list.start_line
             list_data = []
-            running_jobs = self.plotbot.running_jobs
+            running_jobs = self.plotboss.running_jobs
             for job in running_jobs:
                 data = [
                     job.job_id,
@@ -101,7 +102,7 @@ class PlotJobFrame(Frame):
                     job.progress,
                     job.final_dir
                 ]
-                list_data.append(data)
+                list_data.append(copy.deepcopy(data))
 
             # Apply current sort and reformat for humans
             list_data = sorted(list_data,
@@ -135,11 +136,11 @@ class PlotJobFrame(Frame):
 
 
 class PlotView():
-    def __init__(self, plotbot):
-        self.plotbot = plotbot
+    def __init__(self, plotboss):
+        self.plotboss = plotboss
 
     def show_plotview(self, screen):
-        screen.play([Scene([PlotJobFrame(screen, self.plotbot)], -1)], stop_on_resize=True)
+        screen.play([Scene([PlotJobFrame(screen, self.plotboss)], -1)], stop_on_resize=True)
 
 
     def show(self):

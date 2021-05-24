@@ -1,5 +1,5 @@
 import pytest
-from plotbot.plotlog import PlotLogParser
+from plotboss.plotlog import PlotLogParser
 from datetime import datetime
 
 def test_log_parser():

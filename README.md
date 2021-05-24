@@ -1,4 +1,4 @@
-# plotbot: a Chia plotting manager
+# plotboss: a Chia plotting manager
 
 This is a tool for managing [Chia](https://github.com/Chia-Network/chia-blockchain)
 plotting operations.  The tool runs on the plotting machine and provides
@@ -11,7 +11,7 @@ limits.
 - Monitoring of ongoing plotting and archiving jobs, progress, resources used,
   temp files, etc.
 
-plotbot is designed for the following configuration:
+plotboss is designed for the following configuration:
 
 - A plotting machine with an array of `tmp` dirs, a single `tmp2` dir, and an
   array of `dst` dirs to which the plot jobs plot.  The `dst` dirs serve as a
@@ -27,11 +27,11 @@ directory.  This allows analysis of progress (plot phase) as well as timing
 
 ## Functionality
 
-plotbot tools are stateless.  Rather than keep an internal record of what jobs
-have been started, plotbot relies on the process tables, open files, and
+plotboss tools are stateless.  Rather than keep an internal record of what jobs
+have been started, plotboss relies on the process tables, open files, and
 logfiles of plot jobs to understand "what's going on".  This means the tools
 can be stopped and started, even from a different login session, without loss
-of information.  It also means plotbot can see and manage jobs started manually
+of information.  It also means plotboss can see and manage jobs started manually
 or by other tools, as long as their STDOUT/STDERR redirected to a file in a
 known logfile directory.  (Note: The tool relies on reading the chia plot
 command line arguments and the format of the plot tool output.  Changes in

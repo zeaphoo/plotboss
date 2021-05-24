@@ -1,7 +1,7 @@
 import contextlib
 import os
-from plotbot.tail import FileTail
-from plotbot.plotlog import PlotLogParser
+from plotboss.tail import FileTail
+from plotboss.plotlog import PlotLogParser
 import time
 from datetime import datetime
 import subprocess

@@ -4,20 +4,20 @@ from setuptools import setup, find_packages
 
 _version_re = re.compile(r'__version__\s+=\s+(.*)')
 
-with open('plotbot/__init__.py', 'rb') as f:
+with open('plotboss/__init__.py', 'rb') as f:
     version = str(ast.literal_eval(_version_re.search(
         f.read().decode('utf-8')).group(1)))
 
 with open('README.md', 'rb') as f:
     long_description = f.read().decode('utf-8')
 
-packages = ['plotbot']
-packages.extend(map(lambda x: 'plotbot.{}'.format(x), find_packages('plotbot')))
+packages = ['plotboss']
+packages.extend(map(lambda x: 'plotboss.{}'.format(x), find_packages('plotboss')))
 
 setup(
-    name='plotbot',
+    name='plotboss',
     version=version,
-    url='https://github.com/zeaphoo/plotbot/',
+    url='https://github.com/zeaphoo/plotboss/',
     license='MIT',
     author='Wei Zhuo',
     author_email='zeaphoo@qq.com',
@@ -28,7 +28,7 @@ setup(
     include_package_data=False,
     zip_safe=False,
     platforms='any',
-    install_requires=['basepy', 'psutil', 'pendulum', 'asciimatics'],
+    install_requires=['basepy>=0.3.4', 'psutil', 'pendulum', 'asciimatics'],
     extras_require={
         'test': [
             'pytest>=3',

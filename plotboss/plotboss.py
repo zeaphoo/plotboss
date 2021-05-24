@@ -1,5 +1,5 @@
 import os
-from plotbot.plotview import PlotView
+from plotboss.plotview import PlotView
 import time
 from basepy.config import settings
 from .job import PlotJob
@@ -11,9 +11,9 @@ import sys
 
 logger.add("stdout", level=settings.main.get('log_level', 'WARNING'))
 
-class PlotBot():
+class PlotBoss():
     def __init__(self):
-        self.work_dir = os.path.abspath(settings.main.get('work_dir', './plotbot_data'))
+        self.work_dir = os.path.abspath(settings.main.get('work_dir', './plotboss_data'))
         self.max_jobs = settings.main.get('max_jobs', -1)
         self.final_paths = settings.plots.get('final_path', [])
         self.init_work_dir()
@@ -60,7 +60,6 @@ class PlotBot():
 
     def run(self):
         self.load_jobs()
-        # self.manage_jobs()
         job_thread = threading.Thread(target=self.manage_jobs)
         job_thread.daemon = True
         job_thread.start()
@@ -125,8 +124,5 @@ class PlotBot():
 
 
 def main():
-    bot = PlotBot()
-    try:
-        bot.run()
-    except:
-        sys.exit(0)
+    boss = PlotBoss()
+    boss.run()

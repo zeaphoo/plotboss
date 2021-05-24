@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.local.*
-plotbot_data/
+plotboss_data/
 .vscode/
 
 # C extensions

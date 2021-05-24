@@ -1,7 +1,7 @@
-# Default/example plotbot.yaml configuration file
+# Default/example plotboss.yaml configuration file
 
 main:
-    work_dir: "./plotbot_data"
+    work_dir: "./plotboss_data"
     max_jobs: 10
 
 plots:
