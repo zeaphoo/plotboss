@@ -28,8 +28,10 @@ def time_format(sec):
         return '-'
     if sec < 60:
         return '%ds' % sec
+    elif sec < 3600:
+        return '%dm' % (int(sec/ 60))
     else:
-        return '%d:%02d' % (int(sec / 3600), int((sec % 3600) / 60))
+        return '%dh%02dm' % (int(sec / 3600), int((sec % 3600) / 60))
 
 def list_k32_plots(d):
     'List completed k32 plots in a directory (not recursive)'

@@ -1,13 +1,18 @@
 import re
 import math
+import pendulum
+import os
 
 class PlotLogParser:
     def __init__(self):
         self.plot_id = 'xxxxx'
+        self.pool_key = ''
+        self.farmer_key = ''
         self.phase = 0
         self.phase_time = {}  # Map from phase index to time
         self.phase_start_time = {}
         self.phase_subphases = {0:0, 1:0, 2:0, 3:0, 4:0}
+        self.buckets_count = 0
         self.start_time = 0
         self.total_time = 0
         self.n_sorts = 0
@@ -15,17 +20,25 @@ class PlotLogParser:
         self.sort_ratio = 0
         self.tmp_dir = ''
         self.tmp2_dir = ''
+        self.final_dir = ''
         self.target_path = ''
         self.buckets = 128
         self.completed = False
+        self.size = 32
+        self.num_threads = 2
+        self.buffer = 4000
+
 
     @property
     def progress(self):
         phase_offset = {0:0, 1:0, 2:42, 3:61, 4:98}
-        phase_total = {0:1, 1:7, 2:6, 3:6, 4:2}
+        phase_total = {0:1, 1:6.1, 2:6, 3:6, 4:2}
         phase_percent = {0:0, 1:42, 2:19, 3:37, 4:2}
-        current = phase_offset[self.phase] + min(self.phase_subphases[self.phase]/phase_total[self.phase], 1)*phase_percent[self.phase]
-        if current < 0:
+        subphase_progress = 0
+        if self.phase == 1:
+            subphase_progress = min(self.buckets_count/self.buckets, 0.98)
+        current = phase_offset[self.phase] + min((self.phase_subphases[self.phase]+subphase_progress)/phase_total[self.phase], 1)*phase_percent[self.phase]
+        if current <= 0:
             if self.phase == 1:
                 current = 1
         if current > 100:
@@ -39,6 +52,12 @@ class PlotLogParser:
                 if m:
                     pass
 
+                # 2021-05-25T20:37:31.267  chia.plotting.create_plots       : [32mINFO    [0m Creating 1 plots of size 32, pool public key:  a846ed9e450637596481301bf4232c5d283843b8799dcccea336f8e6dd1b3faace63978b4988c5cebbb8096bd9f0614b farmer public key: a1d639b7d0c7a1352973dd46547ec8a6128292a45c80f1fe88471492c0d441e84b8b48c01d6cca74a2dbd51e652acf20[0m
+                m = re.search(r'.*, pool public key:\s+([0-9a-f]*)\s+farmer public key:\s+([0-9a-f]*)\x1b.*', line)
+                if m:
+                    self.pool_key = m.group(1).strip()
+                    self.farmer_key = m.group(2).strip()
+
                 # Temp dirs.  Sample log line:
                 # Starting plotting progress into temporary dirs: /mnt/tmp/01 and /mnt/tmp/a
                 m = re.search(r'^Starting plotting.*dirs: (.*) and (.*)', line)
@@ -46,10 +65,31 @@ class PlotLogParser:
                     self.tmp_dir = m.group(1)
                     self.tmp2_dir = m.group(2)
 
-                m = re.match('^ID: ([0-9a-f]*)', line)
+                m = re.match(r'^ID: ([0-9a-f]*)', line)
                 if m:
                     self.plot_id = m.group(1)
                     self.found_id = True
+
+                # Plot size is: 32
+                # Buffer size is: 4000MiB
+                # Using 128 buckets
+                # Using 4 threads of stripe size 65536
+
+                m = re.match(r'^Plot size is:\s+(\d+)', line)
+                if m:
+                    self.size = int(m.group(1))
+
+                m = re.match(r'^Buffer size is: (\d+)MiB', line)
+                if m:
+                    self.buffer = int(m.group(1))
+
+                m = re.match(r'^Using\s+(\d+)\s+buckets', line)
+                if m:
+                    self.buckets = int(m.group(1))
+
+                m = re.match(r'^Using (\d+) threads .*', line)
+                if m:
+                    self.num_threads = int(m.group(1))
 
 
             # Phase timing.  Sample log line:
@@ -70,29 +110,23 @@ class PlotLogParser:
                 # Phase 1: "Computing table 2"
                 m = re.match(r'^Computing table (\d).*', line)
                 if m:
-                    self.phase_subphases[1] = max(self.phase_subphases[1], int(m.group(1))-1)
+                    subphase = int(m.group(1))-1
+                    if subphase == 1:
+                        subphase = 0.1
+                    elif subphase > 1:
+                        subphase = subphase - 1 + 0.1
+                    self.phase_subphases[1] = max(self.phase_subphases[1], subphase)
+                    self.buckets_count = 0
 
-                m = re.match(r'\s+Bucket (\d+) .*', line)
+                m = re.match(r'^\s+Bucket (\d+) .*', line)
                 if m:
-                    subphase = self.phase_subphases[1] + 1/self.buckets
-                    if math.floor(subphase) != math.floor(self.phase_subphases[1]):
-                        self.phase_subphases[1] = math.floor(self.phase_subphases[1]) + 0.98
-                    else:
-                        self.phase_subphases[1] = subphase
+                    self.buckets_count += 1
 
             if self.phase == 2:
                 # Phase 2: "Backpropagating on table 2"
                 m = re.match(r'^Backpropagating on table (\d).*', line)
                 if m:
                     self.phase_subphases[2] = max(self.phase_subphases[2], 7 - int(m.group(1)))
-
-                m = re.match(r'sorting table (\d+).*', line)
-                if m:
-                    subphase = self.phase_subphases[2] + 0.49
-                    if math.floor(subphase) != math.floor(self.phase_subphases[2]):
-                        self.phase_subphases[2] = math.floor(self.phase_subphases[2]) + 0.98
-                    else:
-                        self.phase_subphases[1] = subphase
 
             if self.phase == 3:
                 # Phase 3: "Compressing tables 4 and 5"
@@ -132,5 +166,6 @@ class PlotLogParser:
             m = re.search(r'^Renamed final file from (.+)\s+to\s+(.+)', line)
             if m:
                 self.target_path = m.group(2).strip(' "')
+                self.final_dir = os.path.dirname(self.target_path)
                 self.phase_subphases[4] = 2
                 self.completed = True
