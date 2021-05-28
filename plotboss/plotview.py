@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 from .utils import time_format, human_format
 import copy
+import psutil
 
 def readable_mem(mem):
     for suffix in ["", "K", "M", "G", "T"]:
@@ -46,10 +47,10 @@ class PlotJobFrame(Frame):
         self._header.disabled = True
         self._header.custom_colour = "label"
         self._list = MultiColumnListBox(
-            18, #Widget.FILL_FRAME,
-            [">12", ">12", "<32", ">8", ">8", ">10", "<32", "100%"],
+            11, #Widget.FILL_FRAME,
+            ["<6", ">12", ">12", "<28", ">8", ">8", ">10", "<32", "100%"],
             [],
-            titles=["JOB_ID", "PLOT_ID", "TMP_DIR", "PID", "PHASE", "ELAPSED", "PROGRESS", "FINAL_DIR"],
+            titles=["INDEX", "JOB_ID", "PLOT_ID", "TMP_DIR", "PID", "PHASE", "ELAPSED", "PROGRESS", "FINAL_DIR"],
             name="mc_list",
             parser=AsciimaticsParser())
         self._drive_list = MultiColumnListBox(
@@ -59,12 +60,18 @@ class PlotJobFrame(Frame):
             titles=["DRIVE", "TEMP/FINAL", "TOTAL", "FREE", "USAGE", "PLOTS"],
             name="drive_list",
             parser=AsciimaticsParser())
+        self._completed_info = TextBox(4, as_string=True)
+        self._completed_info.disabled = True
+        self._sys_info = TextBox(4, as_string=True)
+        self._sys_info.disabled = True
         self.add_layout(layout)
         layout2 = Layout([1], fill_frame=True)
         self.add_layout(layout2)
         layout.add_widget(self._header)
         layout.add_widget(self._list)
         layout2.add_widget(self._drive_list)
+        layout2.add_widget(self._completed_info)
+        layout2.add_widget(self._sys_info)
         layout2.add_widget(
             Label("Press `r` to toggle order, or `q` to quit."))
         self.fix()
@@ -98,8 +105,6 @@ class PlotJobFrame(Frame):
 
             self._update_running_list()
             self._update_drive_list()
-            self._header.value = (
-                "Current {} plot jobs running. {}".format(len(running_jobs), datetime.now()))
 
         # Now redraw as normal
         super(PlotJobFrame, self)._update(frame_no)
@@ -110,8 +115,9 @@ class PlotJobFrame(Frame):
         last_start = self._list.start_line
         list_data = []
         running_jobs = self.plotboss.running_jobs
-        for job in running_jobs:
+        for idx, job in enumerate(running_jobs):
             data = [
+                idx,
                 job.job_id,
                 job.plot_id_prefix(),
                 job.tmp_dir,
@@ -134,14 +140,17 @@ class PlotJobFrame(Frame):
                 str(x[3]),
                 str(x[4]),
                 str(x[5]),
-                self.progress_text(x[6]),
-                str(x[7])
+                str(x[6]),
+                self.progress_text(x[7]),
+                str(x[8])
             ], idx) for idx, x in enumerate(list_data)
         ]
 
         self._list.options = new_data
         self._list.value = last_selection
         self._list.start_line = last_start
+        self._header.value = (
+                "Current {} plot jobs running. {}".format(len(running_jobs), datetime.now()))
 
     def _update_drive_list(self):
         list_data = []
@@ -172,6 +181,24 @@ class PlotJobFrame(Frame):
         self._drive_list.options = new_data
         self._drive_list.value = last_selection
         self._drive_list.start_line = last_start
+
+        completed_statistics = self.plotboss.completed_statistics
+
+        self._completed_info.value = '\n'.join([
+            'Plots Completed Today:{}, Yesterday:{}, Last_7_Days:{}'.format(completed_statistics['today'],
+                completed_statistics['yesterday'], completed_statistics['last_7']),
+            'Plots Average Duration: {}'.format(completed_statistics['average_duration']),
+            'Plots Days: {}'.format(completed_statistics['days'])
+        ])
+
+
+        ram_usage = psutil.virtual_memory()
+
+        self._sys_info.value = '\n'.join([
+            'CPU Usage: {:.1f}%'.format(psutil.cpu_percent()),
+            'RAM Usage: {}/{}, {:.1f}%'.format(human_format(ram_usage.used),
+                    human_format(ram_usage.total), ram_usage.percent)
+        ])
 
     def progress_text(self, percent, length = 20, fill = '█'):
         filledLength = int(length * percent/100)

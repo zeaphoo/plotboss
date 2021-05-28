@@ -1,6 +1,7 @@
 import pytest
 from plotboss.plotlog import PlotLogParser
 from datetime import datetime
+import pendulum
 
 def test_log_parser():
     p = PlotLogParser()
@@ -25,6 +26,7 @@ def test_log_parser():
         assert p.buffer == 4000
         assert p.buckets == 128
         assert p.num_threads == 4
-        assert p.start_time == datetime(2021, 4, 4, 19, 0, 50)
+        assert p.start_time == pendulum.local(2021, 4, 4, 19, 0, 50)
+        assert p.complete_time == pendulum.local(2021, 4, 5, 6, 6, 35)
         assert p.target_path == "/farm/wagons/801/plot-k32-2021-04-04-19-00-3eb8a37981de1cc76187a36ed947ab4307943cf92967a7e166841186c7899e24.plot"
         assert p.final_dir == '/farm/wagons/801'

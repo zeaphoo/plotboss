@@ -5,10 +5,13 @@ import time
 from basepy.config import settings
 from .job import PlotJob
 from .plotview import PlotView
+from .plotlog import PlotLogParser
 import time
 import threading
 from basepy.log import logger
 import sys
+import pendulum
+from .utils import time_format
 
 logger.add("stdout", level=settings.main.get('log_level', 'WARNING'))
 
@@ -21,6 +24,8 @@ class PlotBoss():
         self.running_jobs = []
         self.waiting_jobs = []
         self.completed_jobs = []
+        self.completed_logs = []
+        self.completed_statistics = {}
         self.running_info = {}
         self.plotting_config = {}
         self.load_plotting_config()
@@ -46,6 +51,53 @@ class PlotBoss():
             if job.logfile != None:
                 self.running_jobs.append(job)
 
+    def load_completed(self):
+        log_dir = os.path.join(self.work_dir, 'logs')
+        log_files = []
+        completed_logs = []
+        with os.scandir(log_dir) as it:
+            for entry in it:
+                if entry.name.endswith('.log') and entry.is_file():
+                    log_files.append(os.path.join(log_dir, entry.name))
+        for logf in log_files:
+            with open(logf, 'r') as f:
+                logparser = PlotLogParser()
+                logparser.feed(f.readlines())
+                if logparser.completed:
+                    completed_logs.append(logparser)
+        self.completed_logs = completed_logs
+        self.update_completed_statistics()
+
+    def update_completed_statistics(self):
+        logs_num = len(self.completed_logs)
+        statistics = {'today':0, 'yesterday':0, 'last_7':0,
+            'all':logs_num,
+            'days': 0,
+            'average_duration': 0}
+        if logs_num == 0:
+            self.completed_statistics = statistics
+            return
+        today = pendulum.today()
+        today_completed = list(filter(lambda x: x.complete_time >= today, self.completed_logs))
+        statistics['today'] = len(today_completed)
+
+        yesterday = pendulum.yesterday()
+        yesterday_completed = list(filter(lambda x: x.complete_time >= yesterday and x.complete_time < today, self.completed_logs))
+        statistics['yesterday'] = len(yesterday_completed)
+
+        last7 = pendulum.now().subtract(days=7)
+        last7_completed = list(filter(lambda x: x.complete_time >= last7, self.completed_logs))
+        statistics['last_7'] = len(last7_completed)
+
+        sorted_completed = sorted(self.completed_logs, key=lambda x: x.start_time)
+        first_time = sorted_completed[0].start_time
+        statistics['days'] = (pendulum.now() - first_time).days + 1
+
+        average_duration = sum(map(lambda x: x.total_time, last7_completed))/len(last7_completed)
+        statistics['average_duration'] = time_format(average_duration)
+
+        self.completed_statistics = statistics
+
     def load_drives(self):
         for final_dir in self.final_paths:
             self.final_drives.add(os.path.splitdrive(final_dir)[0])
@@ -65,7 +117,10 @@ class PlotBoss():
     def update_statistics(self):
         drive_statistics = {}
         for drive in self.temp_drives:
-            total, used, free = shutil.disk_usage(drive)
+            try:
+                total, used, free = shutil.disk_usage(drive)
+            except:
+                continue
             usage = used*100/total
             drive_statistics[drive] = {'drive':drive, 'total':total, 'used':used,
                 'free':free, 'type':'tmp', 'usage':usage}
@@ -73,7 +128,10 @@ class PlotBoss():
             if drive in drive_statistics:
                 drive_statistics[drive]['type'] = 'tmp,final'
                 continue
-            total, used, free = shutil.disk_usage(drive)
+            try:
+                total, used, free = shutil.disk_usage(drive)
+            except:
+                continue
             usage = used*100/total
             drive_statistics[drive] = {'drive':drive, 'total':total, 'used':used,
                 'free':free, 'type':'final', 'usage':usage}
@@ -99,6 +157,7 @@ class PlotBoss():
     def run(self):
         self.load_jobs()
         self.load_drives()
+        self.load_completed()
         # logger.debug('drives:', tmp=list(self.temp_drives), final=list(self.final_drives))
         job_thread = threading.Thread(target=self.manage_jobs)
         job_thread.daemon = True
@@ -152,6 +211,8 @@ class PlotBoss():
             job.update()
             if job.completed:
                 self.completed_jobs.append(job)
+                self.completed_logs.append(job.logparser)
+                self.update_completed_statistics()
                 continue
             status = job.get_run_status()
             if status.lower() == 'stopped':

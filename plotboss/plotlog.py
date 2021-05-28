@@ -15,6 +15,7 @@ class PlotLogParser:
         self.buckets_count = 0
         self.start_time = 0
         self.total_time = 0
+        self.complete_time = 0
         self.n_sorts = 0
         self.n_uniform = 0
         self.sort_ratio = 0
@@ -97,7 +98,7 @@ class PlotLogParser:
             for phase in range(self.phase + 1, 5):
                 m = re.search(r'^Starting phase {}/4:.*\.\.\. (.*)'.format(phase), line)
                 if m:
-                    starting_time = pendulum.from_format(m.group(1), 'ddd MMM DD HH:mm:ss YYYY', locale='en', tz=None)
+                    starting_time = pendulum.from_format(m.group(1), 'ddd MMM DD HH:mm:ss YYYY', locale='en', tz='local')
                     if phase == 1:
                         self.start_time = starting_time
                     self.phase_start_time[phase] = starting_time
@@ -157,9 +158,11 @@ class PlotLogParser:
             # Job completion.  Record total time in sliced data store.
             # Sample log line:
             # Total time = 49487.1 seconds. CPU (97.26%) Wed Sep 30 01:22:10 2020
-            m = re.search(r'^Total time = (\d+.\d+) seconds.*', line)
+            m = re.search(r'^Total time = (\d+.\d+) seconds. CPU\s+\(.*\)\s+(.*)', line)
             if m:
                 self.total_time = float(m.group(1))
+                complete_time = pendulum.from_format(m.group(2), 'ddd MMM DD HH:mm:ss YYYY', locale='en', tz='local')
+                self.complete_time = complete_time
                 self.sort_ratio = 100 * self.n_uniform // self.n_sorts
                 self.phase_subphases[4] = 1
 
