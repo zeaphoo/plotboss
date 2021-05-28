@@ -155,7 +155,7 @@ class PlotJob:
                     job = cls.init_from_process(plotcmd, proc)
                     jobs.append(job)
                 except Exception as e:
-                    logger.warning('init from process error', msg=str(e))
+                    logger.warning('init from process error', error_msg=str(e))
 
         return jobs
 

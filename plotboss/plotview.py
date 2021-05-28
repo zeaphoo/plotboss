@@ -10,7 +10,7 @@ import sys
 from collections import defaultdict
 import time
 from datetime import datetime
-from .utils import time_format
+from .utils import time_format, human_format
 import copy
 
 def readable_mem(mem):
@@ -41,21 +41,31 @@ class PlotJobFrame(Frame):
         self.plotboss = plotboss
 
         # Create the basic form layout...
-        layout = Layout([1], fill_frame=True)
+        layout = Layout([1], fill_frame=False)
         self._header = TextBox(1, as_string=True)
         self._header.disabled = True
         self._header.custom_colour = "label"
         self._list = MultiColumnListBox(
-            Widget.FILL_FRAME,
+            18, #Widget.FILL_FRAME,
             [">12", ">12", "<32", ">8", ">8", ">10", "<32", "100%"],
             [],
             titles=["JOB_ID", "PLOT_ID", "TMP_DIR", "PID", "PHASE", "ELAPSED", "PROGRESS", "FINAL_DIR"],
             name="mc_list",
             parser=AsciimaticsParser())
+        self._drive_list = MultiColumnListBox(
+            Widget.FILL_FRAME,
+            [">12", ">12", ">10", ">10", "<32", "<10"],
+            [],
+            titles=["DRIVE", "TEMP/FINAL", "TOTAL", "FREE", "USAGE", "PLOTS"],
+            name="drive_list",
+            parser=AsciimaticsParser())
         self.add_layout(layout)
+        layout2 = Layout([1], fill_frame=True)
+        self.add_layout(layout2)
         layout.add_widget(self._header)
         layout.add_widget(self._list)
-        layout.add_widget(
+        layout2.add_widget(self._drive_list)
+        layout2.add_widget(
             Label("Press `r` to toggle order, or `q` to quit."))
         self.fix()
 
@@ -84,49 +94,84 @@ class PlotJobFrame(Frame):
         # Refresh the list view if needed
         if frame_no - self._last_frame >= self.frame_update_count or self._last_frame == 0:
             self._last_frame = frame_no
-
-            # Create the data to go in the multi-column list...
-            last_selection = self._list.value
-            last_start = self._list.start_line
-            list_data = []
             running_jobs = self.plotboss.running_jobs
-            for job in running_jobs:
-                data = [
-                    job.job_id,
-                    job.plot_id_prefix(),
-                    job.tmp_dir,
-                    job.pid,
-                    job.phase,
-                    time_format(job.elapsed_time),
-                    job.progress,
-                    job.final_dir
-                ]
-                list_data.append(copy.deepcopy(data))
 
-            # Apply current sort and reformat for humans
-            list_data = sorted(list_data,
-                               reverse=self._reverse)
-            new_data = [
-                ([
-                    str(x[0]),
-                    str(x[1]),
-                    str(x[2]),
-                    str(x[3]),
-                    str(x[4]),
-                    str(x[5]),
-                    self.progress_text(x[6]),
-                    str(x[7])
-                ], idx) for idx, x in enumerate(list_data)
-            ]
-
-            self._list.options = new_data
-            self._list.value = last_selection
-            self._list.start_line = last_start
+            self._update_running_list()
+            self._update_drive_list()
             self._header.value = (
                 "Current {} plot jobs running. {}".format(len(running_jobs), datetime.now()))
 
         # Now redraw as normal
         super(PlotJobFrame, self)._update(frame_no)
+
+    def _update_running_list(self):
+        # Create the data to go in the multi-column list...
+        last_selection = self._list.value
+        last_start = self._list.start_line
+        list_data = []
+        running_jobs = self.plotboss.running_jobs
+        for job in running_jobs:
+            data = [
+                job.job_id,
+                job.plot_id_prefix(),
+                job.tmp_dir,
+                job.pid,
+                job.phase,
+                time_format(job.elapsed_time),
+                job.progress,
+                job.final_dir
+            ]
+            list_data.append(copy.deepcopy(data))
+
+        # Apply current sort and reformat for humans
+        list_data = sorted(list_data,
+                            reverse=self._reverse)
+        new_data = [
+            ([
+                str(x[0]),
+                str(x[1]),
+                str(x[2]),
+                str(x[3]),
+                str(x[4]),
+                str(x[5]),
+                self.progress_text(x[6]),
+                str(x[7])
+            ], idx) for idx, x in enumerate(list_data)
+        ]
+
+        self._list.options = new_data
+        self._list.value = last_selection
+        self._list.start_line = last_start
+
+    def _update_drive_list(self):
+        list_data = []
+        last_selection = self._drive_list.value
+        last_start = self._drive_list.start_line
+        for drive, statistics in self.plotboss.drive_statistics.items():
+            data = [
+                drive,
+                statistics['type'],
+                statistics['total'],
+                statistics['free'],
+                statistics['usage'],
+                0
+            ]
+            list_data.append(copy.deepcopy(data))
+
+        new_data = [
+            ([
+                str(x[0]),
+                str(x[1]).upper(),
+                human_format(x[2]),
+                human_format(x[3]),
+                self.progress_text(x[4]),
+                str(x[5])
+            ], idx) for idx, x in enumerate(list_data)
+        ]
+
+        self._drive_list.options = new_data
+        self._drive_list.value = last_selection
+        self._drive_list.start_line = last_start
 
     def progress_text(self, percent, length = 20, fill = '█'):
         filledLength = int(length * percent/100)

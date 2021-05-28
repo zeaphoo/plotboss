@@ -16,7 +16,7 @@ class PlotBoss():
     def __init__(self):
         self.work_dir = os.path.abspath(settings.main.get('work_dir', './plotboss_data'))
         self.max_jobs = settings.main.get('max_jobs', -1)
-        self.final_paths = settings.plots.get('final_path', [])
+        self.final_paths = settings.plots.get('final_dir', [])
         self.init_work_dir()
         self.running_jobs = []
         self.waiting_jobs = []
@@ -63,17 +63,21 @@ class PlotBoss():
 
 
     def update_statistics(self):
-        temp_drives = {}
+        drive_statistics = {}
         for drive in self.temp_drives:
             total, used, free = shutil.disk_usage(drive)
-            temp_drives[drive] = {'total':total, 'used':used, 'free':free}
-        logger.debug(temp_drives)
-        self.temp_drives = temp_drives
-        final_drives = {}
+            usage = used*100/total
+            drive_statistics[drive] = {'drive':drive, 'total':total, 'used':used,
+                'free':free, 'type':'tmp', 'usage':usage}
         for drive in self.final_drives:
+            if drive in drive_statistics:
+                drive_statistics[drive]['type'] = 'tmp,final'
+                continue
             total, used, free = shutil.disk_usage(drive)
-            final_drives[drive] = {'total':total, 'used':used, 'free':free}
-        self.final_drives = final_drives
+            usage = used*100/total
+            drive_statistics[drive] = {'drive':drive, 'total':total, 'used':used,
+                'free':free, 'type':'final', 'usage':usage}
+        self.drive_statistics = drive_statistics
 
     def manage_jobs(self):
         while True:
