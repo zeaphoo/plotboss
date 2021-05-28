@@ -47,7 +47,7 @@ class PlotJobFrame(Frame):
         self._header.custom_colour = "label"
         self._list = MultiColumnListBox(
             Widget.FILL_FRAME,
-            [">12", ">12", "<32", ">8", ">8", ">10", ">16", "100%"],
+            [">12", ">12", "<32", ">8", ">8", ">10", "<32", "100%"],
             [],
             titles=["JOB_ID", "PLOT_ID", "TMP_DIR", "PID", "PHASE", "ELAPSED", "PROGRESS", "FINAL_DIR"],
             name="mc_list",
@@ -72,7 +72,6 @@ class PlotJobFrame(Frame):
             if event.key_code in [ord('q'), ord('Q'), Screen.ctrl("c")]:
                 raise StopApplication("User quit")
             elif event.key_code in [ord("r"), ord("R")]:
-                print('handle key_code', event.key_code)
                 self._reverse = not self._reverse
 
             # Force a refresh for improved responsiveness
@@ -115,7 +114,7 @@ class PlotJobFrame(Frame):
                     str(x[3]),
                     str(x[4]),
                     str(x[5]),
-                    '{:0.1f}%'.format(x[6]),
+                    self.progress_text(x[6]),
                     str(x[7])
                 ], idx) for idx, x in enumerate(list_data)
             ]
@@ -128,6 +127,12 @@ class PlotJobFrame(Frame):
 
         # Now redraw as normal
         super(PlotJobFrame, self)._update(frame_no)
+
+    def progress_text(self, percent, length = 20, fill = '█'):
+        filledLength = int(length * percent/100)
+        percent_str = '{:.1f}'.format(percent)
+        bar = fill * filledLength + '-' * (length - filledLength)
+        return f'|{bar}| {percent_str}%'
 
     @property
     def frame_update_count(self):

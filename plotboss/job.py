@@ -61,8 +61,11 @@ class PlotCommand():
         for key in kwargs:
             if key in self.plot_arg_names:
                 self.cmd_args[key] = kwargs[key]
+        if 'tmp2_dir' not in self.cmd_args:
+            self.cmd_args['tmp2_dir'] = self.cmd_args['tmp_dir']
         for key, value in self.cmd_args.items():
             setattr(self, key, value)
+
         logger.debug('cmd_args', cmd_args=self.cmd_args)
 
     @classmethod
@@ -148,7 +151,11 @@ class PlotJob:
             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
                 plotcmd = PlotCommand.parse(proc.cmdline())
                 if not plotcmd: continue
-                jobs.append(cls.init_from_process(plotcmd, proc))
+                try:
+                    job = cls.init_from_process(plotcmd, proc)
+                    jobs.append(job)
+                except Exception as e:
+                    logger.warning('init from process error', msg=str(e))
 
         return jobs
 

@@ -1,4 +1,5 @@
 import os
+import shutil
 from plotboss.plotview import PlotView
 import time
 from basepy.config import settings
@@ -23,6 +24,10 @@ class PlotBoss():
         self.running_info = {}
         self.plotting_config = {}
         self.load_plotting_config()
+        self.temp_drives = set()
+        self.final_drives = set()
+        self.drive_statistics = {}
+        self.job_statistics = {}
 
     def init_work_dir(self):
         if not os.path.exists(self.work_dir):
@@ -40,6 +45,35 @@ class PlotBoss():
             logger.debug('jobs, ', logfile=job.logfile)
             if job.logfile != None:
                 self.running_jobs.append(job)
+
+    def load_drives(self):
+        for final_dir in self.final_paths:
+            self.final_drives.add(os.path.splitdrive(final_dir)[0])
+        for tmp_dir, conf in self.plotting_config.items():
+            tmp_drive = os.path.splitdrive(tmp_dir)[0]
+            self.temp_drives.add(tmp_drive)
+            tmp2_dir = conf.get('tmp2_dir', None)
+            if tmp2_dir:
+                tmp2_drive = os.path.splitdrive(tmp2_dir)[0]
+                self.temp_drives.add(tmp2_drive)
+        for job in self.running_jobs:
+            self.temp_drives.add(os.path.splitdrive(job.tmp_dir)[0])
+            self.temp_drives.add(os.path.splitdrive(job.tmp2_dir)[0])
+            self.final_drives.add(os.path.splitdrive(job.final_dir)[0])
+
+
+    def update_statistics(self):
+        temp_drives = {}
+        for drive in self.temp_drives:
+            total, used, free = shutil.disk_usage(drive)
+            temp_drives[drive] = {'total':total, 'used':used, 'free':free}
+        logger.debug(temp_drives)
+        self.temp_drives = temp_drives
+        final_drives = {}
+        for drive in self.final_drives:
+            total, used, free = shutil.disk_usage(drive)
+            final_drives[drive] = {'total':total, 'used':used, 'free':free}
+        self.final_drives = final_drives
 
     def manage_jobs(self):
         while True:
@@ -60,9 +94,14 @@ class PlotBoss():
 
     def run(self):
         self.load_jobs()
+        self.load_drives()
+        # logger.debug('drives:', tmp=list(self.temp_drives), final=list(self.final_drives))
         job_thread = threading.Thread(target=self.manage_jobs)
         job_thread.daemon = True
         job_thread.start()
+        statistic_thread = threading.Thread(target=self.update_statistics)
+        statistic_thread.daemon = True
+        statistic_thread.start()
         view = PlotView(self)
         view.show()
 
