@@ -115,27 +115,36 @@ class PlotBoss():
 
 
     def update_statistics(self):
-        drive_statistics = {}
-        for drive in self.temp_drives:
-            try:
-                total, used, free = shutil.disk_usage(drive)
-            except:
-                continue
-            usage = used*100/total
-            drive_statistics[drive] = {'drive':drive, 'total':total, 'used':used,
-                'free':free, 'type':'tmp', 'usage':usage}
-        for drive in self.final_drives:
-            if drive in drive_statistics:
-                drive_statistics[drive]['type'] = 'tmp,final'
-                continue
-            try:
-                total, used, free = shutil.disk_usage(drive)
-            except:
-                continue
-            usage = used*100/total
-            drive_statistics[drive] = {'drive':drive, 'total':total, 'used':used,
-                'free':free, 'type':'final', 'usage':usage}
-        self.drive_statistics = drive_statistics
+        while True:
+            drive_statistics = {}
+            for drive in self.temp_drives:
+                try:
+                    total, used, free = shutil.disk_usage(drive)
+                except:
+                    continue
+                usage = used*100/total
+                drive_statistics[drive] = {'drive':drive, 'total':total, 'used':used,
+                    'free':free, 'type':'tmp', 'usage':usage, 'jobs':set()}
+            for drive in self.final_drives:
+                if drive in drive_statistics:
+                    drive_statistics[drive]['type'] = 'tmp,final'
+                    continue
+                try:
+                    total, used, free = shutil.disk_usage(drive)
+                except:
+                    continue
+                usage = used*100/total
+                drive_statistics[drive] = {'drive':drive, 'total':total, 'used':used,
+                    'free':free, 'type':'final', 'usage':usage, 'jobs':set()}
+
+            for job in self.running_jobs:
+                for some_dir in [job.tmp_dir, job.tmp2_dir, job.final_dir]:
+                    some_drive = os.path.splitdrive(some_dir)[0]
+                    if some_drive in drive_statistics:
+                        drive_statistics[some_drive]['jobs'].add(job.job_id)
+
+            self.drive_statistics = drive_statistics
+            time.sleep(10)
 
     def manage_jobs(self):
         while True:

@@ -57,7 +57,7 @@ class PlotJobFrame(Frame):
             Widget.FILL_FRAME,
             [">12", ">12", ">10", ">10", "<32", "<10"],
             [],
-            titles=["DRIVE", "TEMP/FINAL", "TOTAL", "FREE", "USAGE", "PLOTS"],
+            titles=["DRIVE", "TEMP/FINAL", "TOTAL", "FREE", "USAGE", "JOBS"],
             name="drive_list",
             parser=AsciimaticsParser())
         self._completed_info = TextBox(4, as_string=True)
@@ -163,7 +163,7 @@ class PlotJobFrame(Frame):
                 statistics['total'],
                 statistics['free'],
                 statistics['usage'],
-                0
+                len(statistics['jobs']),
             ]
             list_data.append(copy.deepcopy(data))
 
