@@ -1,5 +1,7 @@
 # plotboss: a Chia plotting manager
 
+![The view of plotboss](https://github.com/zeaphoo/plotboss/blob/main/docs/images/plotboss-0.1.png?raw=true "View")
+
 This is a tool for managing [Chia](https://github.com/Chia-Network/chia-blockchain)
 plotting operations.  The tool runs on the plotting machine and provides
 the following functionality:
