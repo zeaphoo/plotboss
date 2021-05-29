@@ -41,7 +41,7 @@ class PlotLogParser:
         current = phase_offset[self.phase] + min((self.phase_subphases[self.phase]+subphase_progress)/phase_total[self.phase], 1)*phase_percent[self.phase]
         if current <= 0:
             if self.phase == 1:
-                current = 1
+                current = 0.3
         if current > 100:
             current = 100
         return current
