@@ -1,5 +1,6 @@
 import os
 import shutil
+import importlib.resources
 from plotboss.plotview import PlotView
 import time
 from basepy.config import settings
@@ -13,13 +14,11 @@ import sys
 import pendulum
 from .utils import time_format
 
-logger.add("stdout", level=settings.main.get('log_level', 'WARNING'))
-
 class PlotBoss():
     def __init__(self):
         self.work_dir = os.path.abspath(settings.main.get('work_dir', './plotboss_data'))
         self.max_jobs = settings.main.get('max_jobs', -1)
-        self.final_paths = settings.plots.get('final_dir', [])
+        self.final_paths = settings.get('final_dir', [])
         self.init_work_dir()
         self.running_jobs = []
         self.waiting_jobs = []
@@ -37,9 +36,12 @@ class PlotBoss():
     def init_work_dir(self):
         if not os.path.exists(self.work_dir):
             os.makedirs(self.work_dir)
+        logs_dir = os.path.join(self.work_dir, 'logs')
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir)
 
     def load_plotting_config(self):
-        plotting_config_list = settings.plots.get('plotting', [])
+        plotting_config_list = settings.get('jobs', [])
         for conf in plotting_config_list:
             self.plotting_config[conf['tmp_dir']] = conf
 
@@ -195,16 +197,18 @@ class PlotBoss():
         return False
 
     def get_final_dir(self):
-        final_dirs = settings.plots.final_dir
+        final_dirs = settings.final_dir
         return final_dirs[0]
 
     def do_start_new_job(self, tmp_dir):
+        param_keys = ["size", "pool_address", "num_threads", "bukets", "buffer","nobitfield", "farmer_key", "pool_key"]
         conf = self.plotting_config[tmp_dir]
         args = dict(tmp_dir=tmp_dir)
         if 'tmp2_dir' in conf:
             args['tmp2_dir'] = conf['tmp2_dir']
-        for key, value in conf.get('param', {}).items():
-            args[key] = value
+        for key in param_keys:
+            if key in conf:
+                args[key] = conf[key]
         args['final_dir'] = self.get_final_dir()
         job = PlotJob.new(**args)
         job.start()
@@ -237,5 +241,15 @@ class PlotBoss():
 
 
 def main():
+    try:
+        settings.main.get('log_level')
+    except:
+        setting_template = importlib.resources.path("plotboss", "settings.toml")
+        setting_file = 'settings.toml'
+        if not os.path.exists(setting_file):
+            with setting_template as template_file:
+                shutil.copy(template_file, setting_file)
+        settings.reload()
+    logger.add("stdout", level=settings.main.get('log_level', 'WARNING'))
     boss = PlotBoss()
     boss.run()

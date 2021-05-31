@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os
 from asciimatics.event import KeyboardEvent
 from asciimatics.widgets import Frame, Layout, MultiColumnListBox, Widget, Label, TextBox
 from asciimatics.scene import Scene
@@ -43,7 +43,7 @@ class PlotJobFrame(Frame):
 
         # Create the basic form layout...
         layout = Layout([1], fill_frame=False)
-        self._header = TextBox(1, as_string=True)
+        self._header = TextBox(4, as_string=True)
         self._header.disabled = True
         self._header.custom_colour = "label"
         self._list = MultiColumnListBox(
@@ -149,8 +149,11 @@ class PlotJobFrame(Frame):
         self._list.options = new_data
         self._list.value = last_selection
         self._list.start_line = last_start
-        self._header.value = (
-                "Current {} plot jobs running. {}".format(len(running_jobs), datetime.now()))
+        self._header.value = '\n'.join([
+                "Chia plotboss - plot like a boss",
+                "Current [ {} ] plot jobs running. {}".format(len(running_jobs), datetime.now()),
+                "Work directory: [ {} ]".format(os.getcwd()),
+                ])
 
     def _update_drive_list(self):
         list_data = []
