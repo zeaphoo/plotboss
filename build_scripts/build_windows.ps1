@@ -2,7 +2,7 @@
 
 $ErrorActionPreference = "Stop"
 
-mkdir build_scripts\win_build
+#mkdir build_scripts\win_build
 
 git status
 
@@ -43,7 +43,9 @@ pip install --no-index --find-links=.\build_scripts\win_build\ plotboss
 Write-Output "   ---"
 Write-Output "Use pyinstaller to create plotboss .exe's"
 Write-Output "   ---"
-pyinstaller --log-level INFO plotboss
+
+pyinstaller --log-level INFO .\build_scripts\plotboss.spec
+
 
 Write-Output "   ---"
 Write-Output "Windows Installer complete"
