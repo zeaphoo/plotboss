@@ -51,9 +51,18 @@ class PlotCommand():
         if len(cmdline) < 3:
             return None
         cmd0 = cmdline[0]
+        is_chia = False
         if is_windows() and cmd0.lower().endswith('\\chia.exe'):
-            if cmdline[1] == 'plots' and cmdline[2] == 'create':
-                return cls.init_from_cmdlines(cmdline[3:])
+            is_chia = True
+        if cmd0.lower().endswith('/chia') or cmd0.lower() == 'chia':
+            is_chia = True
+
+        if not is_chia:
+            return None
+
+        if cmdline[1] == 'plots' and cmdline[2] == 'create':
+            return cls.init_from_cmdlines(cmdline[3:])
+
         return None
 
     def __init__(self, **kwargs):
