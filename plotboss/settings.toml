@@ -1,12 +1,11 @@
-final_dir = [ ] # For example: ["/mnt/dst/00", "/mnt/dst/01"], The final directory will plot will saved.
+final_dir = [ ] # For example: ["P:\", "T:\"], The final directory will plot will saved.
 
 [main]
-work_dir = "./plotboss_data" #
-# max_jobs = 10 # default is not set.
+max_jobs = 10 # default is not set.
 
 [[jobs]]
-tmp_dir = "/mnt/tmp/00"
-# tmp2_dir = "/mnt/tmp/01"
+tmp_dir = "E:\plotting"
+# tmp2_dir = "F:\plotting"
 # max_jobs = 1
 # job_start_mode = "simple"
 
@@ -20,8 +19,8 @@ tmp_dir = "/mnt/tmp/00"
 # buffer = 4_608
 
 [[jobs]]
-tmp_dir = "/mnt/tmp/02"
-# tmp2_dir = "/mnt/tmp/03"   # optional
+tmp_dir = "G:\plotting"
+# tmp2_dir = "H:\plotting"   # optional
 # max_jobs = 1  # default is 1.
 
 # size = 32

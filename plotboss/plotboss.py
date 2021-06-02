@@ -1,6 +1,7 @@
 import os
 import shutil
 import importlib.resources
+from typing import final
 from plotboss.plotview import PlotView
 import time
 from basepy.config import settings
@@ -12,7 +13,7 @@ import threading
 from loguru import logger
 import sys
 import pendulum
-from .utils import time_format
+from .utils import time_format, get_k32_plotsize
 
 class PlotBoss():
     def __init__(self):
@@ -198,7 +199,25 @@ class PlotBoss():
 
     def get_final_dir(self):
         final_dirs = settings.final_dir
-        return final_dirs[0]
+        for final_dir in final_dirs:
+            final_drive = os.path.splitdrive(final_dir)[0]
+            try:
+                _, _, free = shutil.disk_usage(final_drive)
+                slots_free = free//get_k32_plotsize()
+                if slots_free > self.get_final_drive_jobs(final_dir):
+                    return final_dir
+            except:
+                continue
+
+        return None
+
+    def get_final_drive_jobs(self, final_drive):
+        jobs = 0
+        for job in self.running_jobs:
+            drive = os.path.splitdrive(job.final_dir)[0]
+            if drive == final_drive:
+                jobs += 1
+        return jobs
 
     def do_start_new_job(self, tmp_dir):
         param_keys = ["size", "pool_address", "num_threads", "bukets", "buffer","nobitfield", "farmer_key", "pool_key"]
@@ -209,7 +228,11 @@ class PlotBoss():
         for key in param_keys:
             if key in conf:
                 args[key] = conf[key]
-        args['final_dir'] = self.get_final_dir()
+        final_dir = self.get_final_dir()
+        if final_dir == None:
+            logger.error('Can not found proper final dir when start new job.')
+            return None
+        args['final_dir'] = final_dir
         job = PlotJob.new(**args)
         job.start()
         self.running_jobs.append(job)
