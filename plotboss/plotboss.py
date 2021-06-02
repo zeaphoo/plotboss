@@ -9,7 +9,7 @@ from .plotview import PlotView
 from .plotlog import PlotLogParser
 import time
 import threading
-from basepy.log import logger
+from loguru import logger
 import sys
 import pendulum
 from .utils import time_format
@@ -49,7 +49,7 @@ class PlotBoss():
     def load_jobs(self):
         jobs = PlotJob.get_running_jobs()
         for job in jobs:
-            logger.debug('jobs, ', logfile=job.logfile)
+            logger.debug('jobs, {logfile}', logfile=job.logfile)
             if job.logfile != None:
                 self.running_jobs.append(job)
 
@@ -180,7 +180,7 @@ class PlotBoss():
         view.show()
 
     def try_start_new_job(self, tmp_dir):
-        logger.info('try_start_new_job, ', tmp_dir=tmp_dir)
+        logger.info('try_start_new_job, tmp_dir: {tmp_dir}', tmp_dir=tmp_dir)
         related_jobs = list(filter(lambda x: x.tmp_dir == tmp_dir, self.running_jobs))
         if len(related_jobs) >= self.plotting_config[tmp_dir].get('max_jobs', 1):
             return False
@@ -237,7 +237,7 @@ class PlotBoss():
             running_info[tmp_dir]['running_jobs'] += 1
         self.running_jobs = running_jobs
         self.running_info = running_info
-        logger.debug('running_info', info=running_info)
+        logger.debug('running_info: {info}', info=running_info)
 
 
 def main():
@@ -250,6 +250,8 @@ def main():
             with setting_template as template_file:
                 shutil.copy(template_file, setting_file)
         settings.reload()
-    logger.add("stdout", level=settings.main.get('log_level', 'WARNING'))
+
     boss = PlotBoss()
+    logger.remove()
+    logger.add(os.path.join(boss.work_dir, 'plotboss.log'), level=settings.main.get('log_level', 'WARNING'))
     boss.run()

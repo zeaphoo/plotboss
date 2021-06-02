@@ -8,7 +8,7 @@ import subprocess
 import shutil
 from pathlib import Path
 from basepy.config import settings
-from basepy.log import logger
+from loguru import logger
 
 import psutil
 from psutil import NoSuchProcess
@@ -75,7 +75,7 @@ class PlotCommand():
         for key, value in self.cmd_args.items():
             setattr(self, key, value)
 
-        logger.debug('cmd_args', cmd_args=self.cmd_args)
+        logger.debug('cmd_args: {cmd_args}', cmd_args=self.cmd_args)
 
     @classmethod
     def init_from_cmdlines(cls, cmdlines):
@@ -132,6 +132,8 @@ class PlotCommand():
         if not cmd:
             if is_windows():
                 cmd = self._find_chia_windows()
+        if not cmd:
+            logger.error('chia command not found.!!!')
         return cmd or 'chia'
 
 
@@ -164,7 +166,7 @@ class PlotJob:
                     job = cls.init_from_process(plotcmd, proc)
                     jobs.append(job)
                 except Exception as e:
-                    logger.warning('init from process error', error_msg=str(e))
+                    logger.warning('init from process error: {error_msg}', error_msg=str(e))
 
         return jobs
 
@@ -323,7 +325,7 @@ class PlotJob:
         plot_args.append('>')
         plot_args.append(logfile)
         plot_args.append('2>&1')
-        logger.debug('plot_args', plot_args=plot_args)
+        logger.debug('plot_args: {plot_args}', plot_args=plot_args)
         kwargs = {}
         if is_windows():
             kwargs = {
