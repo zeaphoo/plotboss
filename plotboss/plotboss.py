@@ -1,7 +1,6 @@
 import os
 import shutil
 import importlib.resources
-from typing import final
 from plotboss.plotview import PlotView
 import time
 from basepy.config import settings
