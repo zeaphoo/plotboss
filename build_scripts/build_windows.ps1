@@ -22,9 +22,10 @@ Write-Output "Get PLOTBOSS_INSTALLER_VERSION"
 $env:PLOTBOSS_INSTALLER_VERSION = python .\build_scripts\installer-version.py
 
 if (-not (Test-Path env:PLOTBOSS_INSTALLER_VERSION)) {
-  $env:PLOTBOSS_INSTALLER_VERSION = '0.0.0'
-  Write-Output "WARNING: No environment variable PLOTBOSS_INSTALLER_VERSION set. Using 0.0.0"
-  }
+    $env:PLOTBOSS_INSTALLER_VERSION = '0.0.0'
+    Write-Output "WARNING: No environment variable PLOTBOSS_INSTALLER_VERSION set. Using 0.0.0"
+}
+
 Write-Output "Plotboss Version is: $env:PLOTBOSS_INSTALLER_VERSION"
 Write-Output "   ---"
 

@@ -129,12 +129,15 @@ class PlotCommand():
 
     def chia_cmd(self):
         cmd = shutil.which('chia')
-        if not cmd:
-            if is_windows():
+        if is_windows():
+            if not cmd:
                 cmd = self._find_chia_windows()
         if not cmd:
             logger.error('chia command not found.!!!')
-        return cmd or 'chia'
+        if is_windows():
+            return cmd or 'chia'
+        else:
+            return 'chia'
 
 
     def _find_chia_windows(self):
@@ -327,6 +330,7 @@ class PlotJob:
         plot_args.append('2>&1')
         logger.debug('plot_args: {plot_args}', plot_args=plot_args)
         kwargs = {}
+        logger.debug('plot_args: {plot_args}', plot_args=plot_args)
         if is_windows():
             kwargs = {
                 'creationflags': subprocess.CREATE_NEW_CONSOLE | subprocess.HIGH_PRIORITY_CLASS,

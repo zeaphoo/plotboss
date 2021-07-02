@@ -95,8 +95,12 @@ class PlotBoss():
         first_time = sorted_completed[0].start_time
         statistics['days'] = (pendulum.now() - first_time).days + 1
 
-        average_duration = sum(map(lambda x: x.total_time, last7_completed))/len(last7_completed)
-        statistics['average_duration'] = time_format(average_duration)
+        last7_completed_num = len(last7_completed)
+        if last7_completed_num > 0:
+            average_duration = sum(map(lambda x: x.total_time, last7_completed))/last7_completed_num
+            statistics['average_duration'] = time_format(average_duration)
+        else:
+            statistics['average_duration'] = 'Nan'
 
         self.completed_statistics = statistics
 
