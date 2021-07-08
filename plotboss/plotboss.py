@@ -223,7 +223,7 @@ class PlotBoss():
         return jobs
 
     def do_start_new_job(self, tmp_dir):
-        param_keys = ["size", "pool_address", "num_threads", "bukets", "buffer","nobitfield", "farmer_key", "pool_key"]
+        param_keys = ["size", "pool_contract_address", "num_threads", "bukets", "buffer","nobitfield", "farmer_key", "pool_key"]
         conf = self.plotting_config[tmp_dir]
         args = dict(tmp_dir=tmp_dir)
         if 'tmp2_dir' in conf:
