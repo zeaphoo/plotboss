@@ -155,15 +155,11 @@ class PlotBoss():
     def manage_jobs(self):
         while True:
             self.update()
-            new_job_tmp_dir = None
             for tmp_dir, info in self.running_info.items():
                 if info['running_jobs'] < info['max_jobs'] and self.can_start_new_job():
-                    new_job_tmp_dir = tmp_dir
-                    break
-            if new_job_tmp_dir:
-                if self.try_start_new_job(new_job_tmp_dir):
-                    pass
-                continue
+                    if self.try_start_new_job(tmp_dir):
+                        pass
+
             time.sleep(3.0)
 
     def can_start_new_job(self):
@@ -184,7 +180,7 @@ class PlotBoss():
         view.show()
 
     def try_start_new_job(self, tmp_dir):
-        logger.info('try_start_new_job, tmp_dir: {tmp_dir}', tmp_dir=tmp_dir)
+        # logger.debug('try_start_new_job, tmp_dir: {tmp_dir}', tmp_dir=tmp_dir)
         related_jobs = list(filter(lambda x: x.tmp_dir == tmp_dir, self.running_jobs))
         if len(related_jobs) >= self.plotting_config[tmp_dir].get('max_jobs', 1):
             return False
@@ -194,6 +190,7 @@ class PlotBoss():
             return True
         elif job_start_mode == 'smart':
             phase1_jobs = list(filter(lambda x: x.phase < 2, related_jobs))
+            logger.debug('phase1 jobs: tmp_dir={tmp_dir},  {num}', tmp_dir=tmp_dir, num=len(phase1_jobs))
             if len(phase1_jobs) == 0:
                 self.do_start_new_job(tmp_dir)
                 return True
@@ -223,6 +220,7 @@ class PlotBoss():
         return jobs
 
     def do_start_new_job(self, tmp_dir):
+        logger.debug('do_start_new_job, tmp_dir={tmp_dir}', tmp_dir=tmp_dir)
         param_keys = ["size", "pool_contract_address", "num_threads", "bukets", "buffer","nobitfield", "farmer_key", "pool_key"]
         conf = self.plotting_config[tmp_dir]
         args = dict(tmp_dir=tmp_dir)

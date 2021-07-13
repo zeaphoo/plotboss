@@ -163,6 +163,7 @@ class PlotJob:
             # Ignore processes which most likely have terminated between the time of
             # iteration and data access.
             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
+                logger.debug('process iter:{pid}, cmd={cmd}', pid=proc.pid, cmd=proc.cmdline())
                 plotcmd = PlotCommand.parse(proc.cmdline())
                 if not plotcmd: continue
                 try:
@@ -328,13 +329,12 @@ class PlotJob:
         plot_args.append('>')
         plot_args.append(logfile)
         plot_args.append('2>&1')
-        logger.debug('plot_args: {plot_args}', plot_args=plot_args)
         kwargs = {}
         logger.debug('plot_args: {plot_args}', plot_args=plot_args)
-        if is_windows():
-            kwargs = {
-                'creationflags': subprocess.CREATE_NEW_CONSOLE | subprocess.HIGH_PRIORITY_CLASS,
-            }
+        # if is_windows():
+        #     kwargs = {
+        #         'creationflags': subprocess.CREATE_NEW_CONSOLE | subprocess.HIGH_PRIORITY_CLASS,
+        #     }
 
         p = subprocess.Popen(plot_args,
                 shell=True,
