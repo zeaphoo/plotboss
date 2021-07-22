@@ -48,14 +48,14 @@ class PlotJobFrame(Frame):
         self._header.custom_colour = "label"
         self._list = MultiColumnListBox(
             11, #Widget.FILL_FRAME,
-            ["<6", ">12", ">12", "<28", ">8", ">8", ">10", "<32", "100%"],
+            ["<6", ">12", ">12", "<40", ">8", ">8", ">10", "<32", "100%"],
             [],
             titles=["INDEX", "JOB_ID", "PLOT_ID", "TMP_DIR", "PID", "PHASE", "ELAPSED", "PROGRESS", "FINAL_DIR"],
             name="mc_list",
             parser=AsciimaticsParser())
         self._drive_list = MultiColumnListBox(
             Widget.FILL_FRAME,
-            [">12", ">12", ">10", ">10", "<32", "<10"],
+            ["<40", ">12", ">10", ">10", "<32", "<10"],
             [],
             titles=["DRIVE", "TEMP/FINAL", "TOTAL", "FREE", "USAGE", "JOBS"],
             name="drive_list",

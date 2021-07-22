@@ -158,6 +158,8 @@ class PlotJob:
     @classmethod
     def get_running_jobs(cls):
         jobs = []
+        raw_procs =  []
+
 
         for proc in psutil.process_iter(['pid', 'cmdline']):
             # Ignore processes which most likely have terminated between the time of
@@ -166,11 +168,22 @@ class PlotJob:
                 logger.debug('process iter:{pid}, cmd={cmd}', pid=proc.pid, cmd=proc.cmdline())
                 plotcmd = PlotCommand.parse(proc.cmdline())
                 if not plotcmd: continue
-                try:
-                    job = cls.init_from_process(plotcmd, proc)
-                    jobs.append(job)
-                except Exception as e:
-                    logger.warning('init from process error: {error_msg}', error_msg=str(e))
+                raw_procs.append((plotcmd, proc))
+
+
+        raw_procs_ids = set(map(lambda x: x[1].pid, raw_procs))
+        logger.debug('raw_proc_ids:  {}', raw_procs_ids)
+        for plotcmd, proc in raw_procs:
+            ppid = proc.ppid()
+            logger.debug('process, {}, ppid:{}', proc.pid, ppid)
+            if ppid in raw_procs_ids:
+                continue
+            logger.debug('try add process to job, {}, ppid:{}', proc.pid, ppid)
+            try:
+                job = cls.init_from_process(plotcmd, proc)
+                jobs.append(job)
+            except Exception as e:
+                logger.warning('init from process error: {error_msg}', error_msg=str(e))
 
         return jobs
 
@@ -326,19 +339,32 @@ class PlotJob:
         assert self.proc == None
         plot_args = self.plotcmd.get_cmd()
         logfile = self._get_log_path()
-        plot_args.append('>')
-        plot_args.append(logfile)
-        plot_args.append('2>&1')
+        # plot_args.append('>')
+        # plot_args.append(logfile)
+        # plot_args.append('2>&1')
+        logfile_obj = open(logfile, 'ab')
+
         kwargs = {}
         logger.debug('plot_args: {plot_args}', plot_args=plot_args)
-        # if is_windows():
-        #     kwargs = {
-        #         'creationflags': subprocess.CREATE_NEW_CONSOLE | subprocess.HIGH_PRIORITY_CLASS,
-        #     }
+        if is_windows():
+            kwargs = {
+                'creationflags': subprocess.CREATE_NO_WINDOW
+            }
+        else:
+            kwargs = {
+                'start_new_session': True
+            }
 
         p = subprocess.Popen(plot_args,
-                shell=True,
+                stdout=logfile_obj, stderr=logfile_obj,
+                shell=False,
                 **kwargs)
+        time.sleep(3.0)
+        # outdata, errdata = p.communicate()
+        # logger.info('process {} returns {}, {}', p.pid, outdata, errdata)
+        if p.returncode != None:
+            logger.warning('process {} exited too quickly', p.pid)
+            return False
         self.proc = psutil.Process(p.pid)
         self.logfile = logfile
         if self.wait_file(self.logfile, 6.0):
@@ -363,7 +389,7 @@ class PlotJob:
         return temp_files
 
     def _get_log_path(self):
-        log_root = os.path.abspath(os.path.join(settings.main.get('work_dir', './plotbot_data'), 'logs'))
+        log_root = os.path.abspath(os.path.join(settings.main.get('work_dir', './plotboss_data'), 'logs'))
         if not os.path.exists(log_root):
             os.makedirs(log_root)
         return os.path.join(log_root, '{}.log'.format(self.job_id))

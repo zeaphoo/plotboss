@@ -14,6 +14,9 @@ import sys
 import pendulum
 from .utils import time_format, get_k32_plotsize
 
+def get_drive_path(folder):
+    return os.path.splitdrive(folder)[0] or folder
+
 class PlotBoss():
     def __init__(self):
         self.work_dir = os.path.abspath(settings.main.get('work_dir', './plotboss_data'))
@@ -106,18 +109,18 @@ class PlotBoss():
 
     def load_drives(self):
         for final_dir in self.final_paths:
-            self.final_drives.add(os.path.splitdrive(final_dir)[0])
+            self.final_drives.add(get_drive_path(final_dir))
         for tmp_dir, conf in self.plotting_config.items():
-            tmp_drive = os.path.splitdrive(tmp_dir)[0]
+            tmp_drive = get_drive_path(tmp_dir)
             self.temp_drives.add(tmp_drive)
             tmp2_dir = conf.get('tmp2_dir', None)
             if tmp2_dir:
-                tmp2_drive = os.path.splitdrive(tmp2_dir)[0]
+                tmp2_drive = get_drive_path(tmp2_dir)
                 self.temp_drives.add(tmp2_drive)
         for job in self.running_jobs:
-            self.temp_drives.add(os.path.splitdrive(job.tmp_dir)[0])
-            self.temp_drives.add(os.path.splitdrive(job.tmp2_dir)[0])
-            self.final_drives.add(os.path.splitdrive(job.final_dir)[0])
+            self.temp_drives.add(get_drive_path(job.tmp_dir))
+            self.temp_drives.add(get_drive_path(job.tmp2_dir))
+            self.final_drives.add(get_drive_path(job.final_dir))
 
 
     def update_statistics(self):
@@ -145,7 +148,7 @@ class PlotBoss():
 
             for job in self.running_jobs:
                 for some_dir in [job.tmp_dir, job.tmp2_dir, job.final_dir]:
-                    some_drive = os.path.splitdrive(some_dir)[0]
+                    some_drive = get_drive_path(some_dir)
                     if some_drive in drive_statistics:
                         drive_statistics[some_drive]['jobs'].add(job.job_id)
 
@@ -170,9 +173,9 @@ class PlotBoss():
         self.load_drives()
         self.load_completed()
         # logger.debug('drives:', tmp=list(self.temp_drives), final=list(self.final_drives))
-        job_thread = threading.Thread(target=self.manage_jobs)
-        job_thread.daemon = True
-        job_thread.start()
+        # job_thread = threading.Thread(target=self.manage_jobs)
+        # job_thread.daemon = True
+        # job_thread.start()
         statistic_thread = threading.Thread(target=self.update_statistics)
         statistic_thread.daemon = True
         statistic_thread.start()
@@ -200,7 +203,7 @@ class PlotBoss():
     def get_final_dir(self):
         final_dirs = settings.final_dir
         for final_dir in final_dirs:
-            final_drive = os.path.splitdrive(final_dir)[0]
+            final_drive = get_drive_path(final_dir)
             try:
                 _, _, free = shutil.disk_usage(final_drive)
                 slots_free = free//get_k32_plotsize()
@@ -214,7 +217,7 @@ class PlotBoss():
     def get_final_drive_jobs(self, final_drive):
         jobs = 0
         for job in self.running_jobs:
-            drive = os.path.splitdrive(job.final_dir)[0]
+            drive = get_drive_path(job.final_dir)
             if drive == final_drive:
                 jobs += 1
         return jobs
@@ -235,9 +238,10 @@ class PlotBoss():
             return None
         args['final_dir'] = final_dir
         job = PlotJob.new(**args)
-        job.start()
-        self.running_jobs.append(job)
-        return job
+        if job.start():
+            self.running_jobs.append(job)
+            return job
+        return None
 
     def update(self):
         running_info = {}
