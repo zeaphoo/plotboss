@@ -173,9 +173,9 @@ class PlotBoss():
         self.load_drives()
         self.load_completed()
         # logger.debug('drives:', tmp=list(self.temp_drives), final=list(self.final_drives))
-        # job_thread = threading.Thread(target=self.manage_jobs)
-        # job_thread.daemon = True
-        # job_thread.start()
+        job_thread = threading.Thread(target=self.manage_jobs)
+        job_thread.daemon = True
+        job_thread.start()
         statistic_thread = threading.Thread(target=self.update_statistics)
         statistic_thread.daemon = True
         statistic_thread.start()
