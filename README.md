@@ -2,10 +2,10 @@
 
 ![The view of plotboss](https://github.com/zeaphoo/plotboss/blob/main/docs/images/plotboss-0.1.png?raw=true "View")
 
-##### Development Version: v0.1.0
+##### Development Version: v0.3.0
 
 This is a tool for managing [Chia](https://github.com/Chia-Network/chia-blockchain)
-plotting operations, has been tested for **Windows 10**.  This is not a plotter.
+plotting operations, has been tested for **Windows 10**, **Ubuntu 21.04**, **MacOS**.  This is not a plotter.
 The tool runs on the plotting machine and provides the following functionality:
 
 - Automatic spawning of new plotting jobs, possibly overlapping ("staggered or smart")

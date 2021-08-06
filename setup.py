@@ -29,7 +29,7 @@ setup(
     include_package_data=False,
     zip_safe=False,
     platforms='any',
-    install_requires=['basepy>=0.3.4', 'psutil', 'pendulum', 'asciimatics', 'loguru'],
+    install_requires=['basepy>=0.3.5', 'psutil', 'pendulum', 'asciimatics', 'loguru'],
     extras_require={
         'test': [
             'pytest>=3',

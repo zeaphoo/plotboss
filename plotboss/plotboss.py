@@ -207,7 +207,7 @@ class PlotBoss():
             try:
                 _, _, free = shutil.disk_usage(final_drive)
                 slots_free = free//get_k32_plotsize()
-                if slots_free > self.get_final_drive_jobs(final_dir):
+                if slots_free > (self.get_final_drive_jobs(final_dir) + 3):
                     return final_dir
             except:
                 continue
